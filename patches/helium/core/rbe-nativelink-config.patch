@@ -62,8 +62,8 @@
      use_input_root_absolute_path = False
 --- a/build/config/siso/mac.star
 +++ b/build/config/siso/mac.star
-@@ -8,11 +8,13 @@ load("@builtin//path.star", "path")
- load("@builtin//struct.star", "module")
+@@ -9,11 +9,13 @@ load("@builtin//struct.star", "module")
+ load("./apple.star", "apple")
  load("./clang_mac.star", "clang")
  load("./config.star", "config")
 +load("./devtools_frontend.star", "devtools_frontend")
@@ -75,15 +75,15 @@
 +    fg.update(devtools_frontend.filegroups(ctx))
      return fg
  
- def __codesign(ctx, cmd):
-@@ -61,6 +63,7 @@ __handlers.update(clang.handlers)
+ def __download_from_google_storage(ctx, cmd):
+@@ -29,6 +31,7 @@ __handlers.update(clang.handlers)
  def __step_config(ctx, step_config):
      config.check(ctx)
      step_config = clang.step_config(ctx, step_config)
 +    step_config = devtools_frontend.step_config(ctx, step_config)
+     step_config = apple.step_config(ctx, step_config)
      step_config["rules"].extend([
          {
-             "name": "codesign",
 --- a/build/config/siso/main.star
 +++ b/build/config/siso/main.star
 @@ -28,6 +28,10 @@ load("./windows.star", chromium_windows
@@ -97,7 +97,7 @@
              inputs = rule.get("inputs", [])
              if "third_party/cpython3/linux-amd64:cpython3" not in inputs:
                  inputs.append("third_party/cpython3/linux-amd64:cpython3")
-@@ -43,16 +47,23 @@ def __disable_remote(ctx, step_config):
+@@ -64,16 +68,23 @@ def __disable_remote_host_tools_for_msan
      return step_config
  
  def __unset_timeout(ctx, step_config):
@@ -130,3 +130,53 @@
      return step_config
  
  def init(ctx):
+--- a/build/config/siso/blink_all.star
++++ b/build/config/siso/blink_all.star
+@@ -17,7 +17,7 @@ __handlers = {
+ }
+ 
+ def __step_config(ctx, step_config):
+-    remote_run = config.get(ctx, "googlechrome")
++    remote_run = config.get(ctx, "googlechrome") or config.get(ctx, "remote-generators")
+ 
+     # crbug.com/461609630: Remote exec fails when blink enabled.
+     if gn_logs.read(ctx).get("blink_enable_generated_code_formatting") == "true":
+@@ -35,11 +35,21 @@ def __step_config(ctx, step_config):
+     ])
+ 
+     # TODO: Enable remote actions for Mac and Windows.
+-    if runtime.os == "linux":
++    if runtime.os == "linux" or config.get(ctx, "remote-generators"):
++        run_with_pythonpath = platform.python_bin + " ../../third_party/blink/renderer/build/scripts/run_with_pythonpath.py -I ../../third_party/blink/renderer/build/scripts -I ../../third_party -I ../../third_party/pyjson5/src -I ../../tools ../../third_party/blink/renderer/build/scripts/"
++        if runtime.os != "linux":
++            # The CSS generators and color_data (gperf.py) run the host's gperf,
++            # which Linux workers can't execute.
++            for script in ["core/css/", "core/style/", "gperf.py"]:
++                step_config["rules"].append({
++                    "name": "blink/run_with_pythonpath/" + script,
++                    "command_prefix": run_with_pythonpath + script,
++                    "remote": False,
++                })
+         step_config["rules"].extend([
+             {
+                 "name": "blink/run_with_pythonpath",
+-                "command_prefix": platform.python_bin + " ../../third_party/blink/renderer/build/scripts/run_with_pythonpath.py -I ../../third_party/blink/renderer/build/scripts -I ../../third_party -I ../../third_party/pyjson5/src -I ../../tools ../../third_party/blink/renderer/build/scripts/",
++                "command_prefix": run_with_pythonpath,
+                 "remote": remote_run,
+                 "timeout": "2m",
+                 # crbug.com/372628498:
+--- a/build/config/siso/devtools_frontend.star
++++ b/build/config/siso/devtools_frontend.star
+@@ -49,7 +49,11 @@ def __step_config(ctx, step_config):
+         {
+             "name": "devtools-frontend/build/generate_css_js_files",
+             "command_prefix": platform.python_bin + " ../../third_party/node/node.py ../../third_party/devtools-frontend/src/scripts/build/generate_css_js_files.js",
+-            "remote": config.get(ctx, "default-remote"),
++            # devtools-frontend's node.gni only lists the host's node binary.
++            "inputs": [
++                "third_party/node/linux/node-linux-x64/bin/node",
++            ],
++            "remote": config.get(ctx, "default-remote") or config.get(ctx, "remote-generators"),
+             "output_local": True,
+             "timeout": "2m",
+             "remote_command": platform.remote_python_bin,

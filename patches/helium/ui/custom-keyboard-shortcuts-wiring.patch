@@ -8,7 +8,7 @@
  #include "chrome/browser/browser_process.h"
  #include "chrome/browser/browsing_data/browsing_data_important_sites_util.h"
  #include "chrome/browser/desktop_to_mobile_promos/promos_utils.h"
-@@ -84,6 +85,10 @@
+@@ -85,6 +86,10 @@
  #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
  #include "chrome/browser/ui/browser_init_state.h"
@@ -19,7 +19,7 @@
  #include "chrome/browser/ui/browser_tabstrip.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-@@ -1182,6 +1187,15 @@ BrowserView::BrowserView(BrowserWindowIn
+@@ -1189,6 +1194,15 @@ BrowserView::BrowserView(BrowserWindowIn
      global_error_observation_.Observe(global_error_service);
    }
  
@@ -33,9 +33,9 @@
 +  }
 +
  #if BUILDFLAG(IS_CHROMEOS)
-   on_locked_task_subscription_ =
-       ash::boca::OnTaskLockedController::From(browser_)
-@@ -1197,6 +1211,11 @@ BrowserView::BrowserView(BrowserWindowIn
+   // With the unified controller, LockedStateController handles the window
+   // updates done in OnLockedForOnTaskUpdated().
+@@ -1209,6 +1223,11 @@ BrowserView::BrowserView(BrowserWindowIn
  }
  
  BrowserView::~BrowserView() {
@@ -47,7 +47,7 @@
    // Remove the layout manager to avoid dangling. This needs to be earlier than
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
-@@ -4288,6 +4307,10 @@ void BrowserView::OnWidgetActivationChan
+@@ -4320,6 +4339,10 @@ void BrowserView::OnWidgetActivationChan
  
    ExtensionKeybindingRegistryViews::From(browser_)->OnHostActivationChanged(
        active);
@@ -58,7 +58,7 @@
  }
  
  void BrowserView::OnWidgetBoundsChanged(views::Widget* widget,
-@@ -5791,7 +5814,20 @@ void BrowserView::LoadAccelerators() {
+@@ -5834,7 +5857,20 @@ void BrowserView::LoadAccelerators() {
        browser_->GetProfile()->IsOffTheRecord() &&
        browser_->GetProfile()->GetOTRProfileID().IsCaptivePortal();
  #endif
@@ -80,7 +80,7 @@
    for (const auto& entry : accelerator_list) {
      // In app mode, only allow accelerators of allowlisted commands to pass
      // through.
-@@ -5820,11 +5856,13 @@ void BrowserView::LoadAccelerators() {
+@@ -5863,11 +5899,13 @@ void BrowserView::LoadAccelerators() {
  #endif
  
      ui::Accelerator accelerator(entry.keycode, entry.modifiers);
@@ -96,9 +96,9 @@
 +    }
    }
  
-   // Register the Esc accelerators (both press and release) to ensure they are
-@@ -5844,6 +5882,33 @@ void BrowserView::LoadAccelerators() {
-   }
+ #if BUILDFLAG(IS_MAC)
+@@ -5896,6 +5934,33 @@ void BrowserView::LoadAccelerators() {
+ #endif
  }
  
 +void BrowserView::ReloadAccelerators() {
@@ -149,7 +149,7 @@
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
                      public BookmarkBarController::Delegate {
-@@ -750,6 +752,9 @@ class BrowserView : public BrowserWindow
+@@ -753,6 +755,9 @@ class BrowserView : public BrowserWindow
    // GlobalErrorObserver:
    void OnGlobalErrorsChanged() override;
  
@@ -159,7 +159,7 @@
    // ImmersiveModeController::Observer:
    void OnImmersiveFullscreenEntered() override;
    void OnImmersiveFullscreenExited() override;
-@@ -983,6 +988,8 @@ class BrowserView : public BrowserWindow
+@@ -985,6 +990,8 @@ class BrowserView : public BrowserWindow
    // Copy the accelerator table from the app resources into something we can
    // use.
    void LoadAccelerators();
@@ -168,7 +168,7 @@
  
    // Retrieves the command id for the specified Windows app command.
    int GetCommandIDForAppCommandID(int app_command_id) const;
-@@ -1274,6 +1281,8 @@ class BrowserView : public BrowserWindow
+@@ -1272,6 +1279,8 @@ class BrowserView : public BrowserWindow
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
@@ -177,3 +177,13 @@
  
    // True if we have already been initialized.
    bool initialized_ = false;
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -722,6 +722,7 @@ source_set("browser_view_header") {
+     "//chrome/browser/ui:browser_window_header",
+     "//chrome/browser/ui:download_close_type",
+     "//chrome/browser/ui/bookmarks",
++    "//chrome/browser/ui/browser_shortcuts",
+     "//chrome/browser/ui/browser_window",
+     "//chrome/browser/ui/global_error",
+     "//chrome/browser/ui/immersive:immersive_mode_controller",

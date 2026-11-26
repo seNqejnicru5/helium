@@ -14,7 +14,7 @@
  inline constexpr char kShowHomeButton[] = "browser.show_home_button";
 --- a/chrome/browser/ui/browser_ui_prefs.cc
 +++ b/chrome/browser/ui/browser_ui_prefs.cc
-@@ -141,6 +141,8 @@ void RegisterBrowserUserPrefs(user_prefs
+@@ -146,6 +146,8 @@ void RegisterBrowserUserPrefs(user_prefs
  
    registry->RegisterBooleanPref(prefs::kHeliumMinimalLocationBar, false);
  
@@ -25,7 +25,7 @@
    registry->RegisterBooleanPref(prefs::kShowHomeButton, false,
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -313,6 +313,9 @@
+@@ -387,6 +387,9 @@
      <message name="IDS_SETTINGS_MINIMAL_LOCATION_BAR" desc="Label for the toggle that enables the minimal URL in the address bar, showing only the site origin.">
        Minimal URL in the address bar
      </message>
@@ -37,7 +37,7 @@
      </message>
 --- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -624,6 +624,7 @@ void AddAppearanceStrings(content::WebUI
+@@ -655,6 +655,7 @@ void AddAppearanceStrings(content::WebUI
        {"centeredLocationBar", IDS_SETTINGS_CENTERED_LOCATION_BAR},
        {"verticalCollapseShortcut", IDS_SETTINGS_VERTICAL_COLLAPSE_SHORTCUT},
        {"minimalLocationBar", IDS_SETTINGS_MINIMAL_LOCATION_BAR},
@@ -47,7 +47,7 @@
        {"showZoomIndicator", IDS_SETTINGS_SHOW_ZOOM_INDICATOR},
 --- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
 +++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -226,6 +226,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
+@@ -230,6 +230,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
        settings_api::PrefType::kBoolean;
    (*s_allowlist)[::prefs::kHeliumMinimalLocationBar] =
        settings_api::PrefType::kBoolean;
@@ -58,7 +58,7 @@
        settings_api::PrefType::kBoolean;
 --- a/chrome/browser/resources/settings/appearance_page/appearance_layout_page.html.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_layout_page.html.ts
-@@ -54,6 +54,10 @@ export function getHtml(this: SettingsAp
+@@ -61,6 +61,10 @@ export function getHtml(this: SettingsAp
        label="$i18n{minimalLocationBar}">
    </settings-toggle-button>
    <settings-toggle-button class="hr"
@@ -71,7 +71,7 @@
        sub-label="$i18n{browserZenModeDescription}">
 --- /dev/null
 +++ b/chrome/browser/ui/views/location_bar/location_bar_progress_view.cc
-@@ -0,0 +1,407 @@
+@@ -0,0 +1,425 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -163,7 +163,10 @@
 +}  // namespace
 +
 +LocationBarProgressView::LocationBarProgressView(PrefService* pref_service)
-+    : progress_animation_(this), pulse_animation_(this), fade_animation_(this) {
++    : views::AnimationDelegateViews(this),
++      progress_animation_(this),
++      pulse_animation_(this),
++      fade_animation_(this) {
 +  SetCanProcessEventsWithinSubtree(false);
 +  SetFlipCanvasOnPaintForRTLUI(true);
 +  SetPaintToLayer();
@@ -240,6 +243,12 @@
 +  if (!has_active_progress_ || finishing_) {
 +    return;
 +  }
++  // Animations only step on compositor frames, so a finish that isn't on
++  // screen would only fade out once the window comes back.
++  if (!IsShownInWindow()) {
++    ResetState();
++    return;
++  }
 +  finishing_ = true;
 +  if (!progress_animation_.is_animating() && GetDisplayedProgress() >= 1.0) {
 +    StartFadeOut();
@@ -272,6 +281,11 @@
 +void LocationBarProgressView::UpdateVisibility() {
 +  SetVisible(IsProgressBarEnabled() && has_active_progress_ &&
 +             !location_bar_focused_);
++}
++
++bool LocationBarProgressView::IsShownInWindow() const {
++  return IsDrawn() && GetWidget() && GetWidget()->IsVisible() &&
++         !GetWidget()->IsMinimized();
 +}
 +
 +bool LocationBarProgressView::IsProgressBarEnabled() const {
@@ -439,8 +453,12 @@
 +void LocationBarProgressView::VisibilityChanged(views::View* starting_from,
 +                                                bool is_visible) {
 +  views::View::VisibilityChanged(starting_from, is_visible);
-+  const bool visible = is_visible && IsDrawn() && GetWidget() &&
-+                       GetWidget()->IsVisible();
++  const bool visible = is_visible && IsShownInWindow();
++  if (!visible && finishing_) {
++    // The finish can't animate while hidden, so drop it now instead.
++    ResetState();
++    return;
++  }
 +  const base::TimeDelta duration =
 +      gfx::Animation::RichAnimationDuration(kProgressPulseDuration);
 +  if (visible && has_active_progress_ && !finishing_ && !duration.is_zero()) {
@@ -481,7 +499,7 @@
 +END_METADATA
 --- /dev/null
 +++ b/chrome/browser/ui/views/location_bar/location_bar_progress_view.h
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,71 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -492,16 +510,16 @@
 +#include "components/prefs/pref_change_registrar.h"
 +#include "content/public/browser/web_contents_observer.h"
 +#include "ui/base/metadata/metadata_header_macros.h"
-+#include "ui/gfx/animation/animation_delegate.h"
 +#include "ui/gfx/animation/slide_animation.h"
 +#include "ui/gfx/animation/throb_animation.h"
++#include "ui/views/animation/animation_delegate_views.h"
 +#include "ui/views/view.h"
 +
 +class PrefService;
 +
 +class LocationBarProgressView : public views::View,
 +                                public content::WebContentsObserver,
-+                                public gfx::AnimationDelegate {
++                                public views::AnimationDelegateViews {
 +  METADATA_HEADER(LocationBarProgressView, views::View)
 +
 + public:
@@ -521,6 +539,7 @@
 +  void StartFadeOut();
 +  void ResetState();
 +  void UpdateVisibility();
++  bool IsShownInWindow() const;
 +  bool IsProgressBarEnabled() const;
 +  void SyncFromWebContents();
 +
@@ -535,7 +554,7 @@
 +  void OnPaint(gfx::Canvas* canvas) override;
 +  void VisibilityChanged(views::View* starting_from, bool is_visible) override;
 +
-+  // gfx::AnimationDelegate:
++  // views::AnimationDelegateViews:
 +  void AnimationProgressed(const gfx::Animation* animation) override;
 +  void AnimationEnded(const gfx::Animation* animation) override;
 +  void AnimationCanceled(const gfx::Animation* animation) override;
@@ -554,8 +573,8 @@
 +#endif  // CHROME_BROWSER_UI_VIEWS_LOCATION_BAR_LOCATION_BAR_PROGRESS_VIEW_H_
 --- a/chrome/browser/ui/views/location_bar/BUILD.gn
 +++ b/chrome/browser/ui/views/location_bar/BUILD.gn
-@@ -96,6 +96,8 @@ source_set("impl") {
-       "location_bar_actions.cc",
+@@ -92,6 +92,8 @@ source_set("impl") {
+       "lens_overlay_homework_page_action_controller.cc",
        "location_bar_bubble_delegate_view.cc",
        "location_bar_layout.cc",
 +      "location_bar_progress_view.cc",
@@ -563,15 +582,15 @@
        "location_bar_view.cc",
        "location_icon_state_helper.cc",
        "location_icon_view.cc",
-@@ -113,6 +115,7 @@ source_set("impl") {
-     public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+@@ -107,6 +109,7 @@ source_set("impl") {
+     ]
  
      deps += [
 +      "//cc/paint",
        "//chrome/app:generated_resources",
        "//chrome/app/vector_icons",
        "//chrome/browser:primitives",
-@@ -171,6 +174,7 @@ source_set("impl") {
+@@ -166,6 +169,7 @@ source_set("impl") {
        "//chrome/browser/ui/window_metadata",
        "//chrome/browser/web_applications",
        "//chrome/browser/web_applications:features",
@@ -579,15 +598,15 @@
        "//components/autofill/core/common:features",
        "//components/commerce/core:feature_list",
        "//components/contextual_search:public",
-@@ -184,6 +188,7 @@ source_set("impl") {
-       "//components/omnibox/browser:vector_icons",
+@@ -181,6 +185,7 @@ source_set("impl") {
        "//components/omnibox/common",
+       "//components/omnibox/common:features",
        "//components/performance_manager",
 +      "//components/prefs",
        "//components/record_replay/core/browser",
        "//components/record_replay/core/common",
        "//components/safe_browsing/core/common:features",
-@@ -206,6 +211,7 @@ source_set("impl") {
+@@ -203,6 +208,7 @@ source_set("impl") {
        "//ui/gfx",
        "//ui/native_theme",
        "//ui/strings:ui_strings_grit",
@@ -605,7 +624,7 @@
  class OmniboxController;
  class OmniboxContextMenu;
  enum class OmniboxPart;
-@@ -605,6 +606,9 @@ class LocationBarView
+@@ -617,6 +618,9 @@ class LocationBarView
    // A label to show the AI Mode hint text.
    raw_ptr<views::Label> ai_mode_hint_label_ = nullptr;
  
@@ -618,14 +637,14 @@
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -65,6 +65,7 @@
+ #include "chrome/browser/ui/views/location_bar/content_setting_image_view.h"
  #include "chrome/browser/ui/views/location_bar/extension_debugger_warning_view.h"
- #include "chrome/browser/ui/views/location_bar/location_bar_actions.h"
  #include "chrome/browser/ui/views/location_bar/location_bar_layout.h"
 +#include "chrome/browser/ui/views/location_bar/location_bar_progress_view.h"
  #include "chrome/browser/ui/views/location_bar/location_bar_util.h"
  #include "chrome/browser/ui/views/location_bar/location_icon_state_helper.h"
  #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
-@@ -544,6 +545,10 @@ void LocationBarView::Init() {
+@@ -549,6 +550,10 @@ void LocationBarView::Init() {
              *profile_, this, omnibox_chip_font_list));
    }
  
@@ -636,7 +655,7 @@
    // Initialize the location entry. We do this to avoid a black flash which is
    // visible when the location entry has just been initialized.
    Update(nullptr);
-@@ -693,10 +698,13 @@ const OmniboxController* LocationBarView
+@@ -701,10 +706,13 @@ const OmniboxController* LocationBarView
  }
  
  void LocationBarView::AddedToWidget() {
@@ -651,7 +670,7 @@
    }
  }
  
-@@ -709,13 +717,17 @@ void LocationBarView::RemovedFromWidget(
+@@ -717,13 +725,17 @@ void LocationBarView::RemovedFromWidget(
  }
  
  void LocationBarView::OnDidChangeFocus(views::View* before, views::View* now) {
@@ -670,7 +689,7 @@
      return;
    }
  
-@@ -1076,6 +1088,8 @@ void LocationBarView::Layout(PassKey) {
+@@ -1073,6 +1085,8 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -679,7 +698,7 @@
    LayoutSuperclass<View>(this);
  }
  
-@@ -1108,6 +1122,7 @@ bool LocationBarView::HasSecurityStateCh
+@@ -1105,6 +1119,7 @@ bool LocationBarView::HasSecurityStateCh
  
  void LocationBarView::Update(WebContents* contents) {
    TRACE_EVENT("omnibox", "LocationBarView::Update");
@@ -687,7 +706,7 @@
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
-@@ -2109,6 +2124,8 @@ const LocationBarModel* LocationBarView:
+@@ -2190,6 +2205,8 @@ const LocationBarModel* LocationBarView:
  }
  
  void LocationBarView::OnOmniboxFocused() {
@@ -696,7 +715,7 @@
    if (views::FocusRing::Get(this)) {
      views::FocusRing::Get(this)->Refresh();
    }
-@@ -2132,6 +2149,8 @@ void LocationBarView::OpenOmniboxPopup(b
+@@ -2214,6 +2231,8 @@ void LocationBarView::OpenOmniboxPopup(b
  }
  
  void LocationBarView::OnOmniboxBlurred() {

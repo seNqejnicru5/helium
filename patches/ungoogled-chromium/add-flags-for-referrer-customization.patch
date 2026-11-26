@@ -19,7 +19,7 @@
  #endif  // CHROME_BROWSER_UNGOOGLED_FLAG_ENTRIES_H_
 --- a/content/browser/renderer_host/navigation_request.cc
 +++ b/content/browser/renderer_host/navigation_request.cc
-@@ -194,6 +194,7 @@
+@@ -196,6 +196,7 @@
  #include "services/network/public/cpp/permissions_policy/fenced_frame_permissions_policies.h"
  #include "services/network/public/cpp/permissions_policy/permissions_policy_declaration.h"
  #include "services/network/public/cpp/permissions_policy/permissions_policy_features.h"
@@ -27,9 +27,9 @@
  #include "services/network/public/cpp/resource_request_body.h"
  #include "services/network/public/cpp/supports_loading_mode/supports_loading_mode_parser.h"
  #include "services/network/public/cpp/url_loader_completion_status.h"
-@@ -419,10 +420,10 @@ void AddAdditionalRequestHeaders(
-       net::HttpRequestHeaders::kUserAgent,
-       ComputeUserAgentValue(user_agent_override));
+@@ -423,10 +424,10 @@ void AddAdditionalRequestHeaders(
+   headers->SetHeaderIfMissing(net::HttpRequestHeaders::kUserAgent,
+                               ComputeUserAgentValue(user_agent_override));
  
 -  if (!render_prefs.enable_referrers) {
 -    *referrer =
@@ -44,7 +44,7 @@
    std::optional<std::string> existing_origin =
 --- a/content/renderer/render_frame_impl.cc
 +++ b/content/renderer/render_frame_impl.cc
-@@ -137,6 +137,7 @@
+@@ -136,6 +136,7 @@
  #include "services/network/public/cpp/content_decoding_interceptor.h"
  #include "services/network/public/cpp/features.h"
  #include "services/network/public/cpp/not_implemented_url_loader_factory.h"
@@ -100,7 +100,7 @@
  }
 --- a/services/network/public/cpp/BUILD.gn
 +++ b/services/network/public/cpp/BUILD.gn
-@@ -139,6 +139,8 @@ component("cpp") {
+@@ -138,6 +138,8 @@ component("cpp") {
      "parsed_headers.cc",
      "parsed_headers.h",
      "record_ontransfersizeupdate_utils.h",

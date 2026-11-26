@@ -1,6 +1,6 @@
 --- a/chrome/common/pref_names.h
 +++ b/chrome/common/pref_names.h
-@@ -907,6 +907,10 @@ inline constexpr char kEnableReferrers[]
+@@ -883,6 +883,10 @@ inline constexpr char kEnableReferrers[]
  // Whether to send the DNT header.
  inline constexpr char kEnableDoNotTrack[] = "enable_do_not_track";
  
@@ -69,7 +69,7 @@
    if (!data.ReadWebrtcIpHandlingPolicy(&out->webrtc_ip_handling_policy))
 --- a/chrome/browser/renderer_preferences_util.cc
 +++ b/chrome/browser/renderer_preferences_util.cc
-@@ -155,15 +155,8 @@ void UpdateFromSystemSettings(blink::Ren
+@@ -157,15 +157,8 @@ void UpdateFromSystemSettings(blink::Ren
    prefs->enable_referrers = pref_service->GetBoolean(prefs::kEnableReferrers);
    prefs->enable_do_not_track =
        pref_service->GetBoolean(prefs::kEnableDoNotTrack);
@@ -131,7 +131,7 @@
                            HTMLFrameOwnerElement*) override;
 --- a/third_party/blink/renderer/core/frame/local_frame_client_impl.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame_client_impl.cc
-@@ -992,6 +992,11 @@ String LocalFrameClientImpl::DoNotTrackV
+@@ -988,6 +988,11 @@ String LocalFrameClientImpl::DoNotTrackV
    return String();
  }
  
@@ -204,7 +204,7 @@
    ResourceFetcher* Fetcher() override;
 --- a/third_party/blink/renderer/core/workers/worker_or_worklet_global_scope.cc
 +++ b/third_party/blink/renderer/core/workers/worker_or_worklet_global_scope.cc
-@@ -385,6 +385,11 @@ void WorkerOrWorkletGlobalScope::Initial
+@@ -400,6 +400,11 @@ void WorkerOrWorkletGlobalScope::Initial
    }
  }
  
@@ -303,7 +303,7 @@
  // available, but not whether to include headers.
 --- a/third_party/blink/common/global_privacy_control/global_privacy_control_util.cc
 +++ b/third_party/blink/common/global_privacy_control/global_privacy_control_util.cc
-@@ -50,4 +50,9 @@ void MaybeRecordGlobalPrivacyControlSour
+@@ -56,4 +56,9 @@ void MaybeRecordGlobalPrivacyControlSour
    }
  }
  
@@ -315,7 +315,7 @@
  }  // namespace blink
 --- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
 +++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -488,6 +488,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
+@@ -492,6 +492,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
    (*s_allowlist)[::prefs::kEnableDoNotTrack] = settings_api::PrefType::kBoolean;
    (*s_allowlist)[universal_optout::prefs::kUniversalOptOutEnabled] =
        settings_api::PrefType::kBoolean;
@@ -326,9 +326,9 @@
    (*s_allowlist)[::prefs::kSearchSuggestEnabled] =
 --- a/third_party/blink/public/web/web_v8_features.h
 +++ b/third_party/blink/public/web/web_v8_features.h
-@@ -40,6 +40,8 @@ class BLINK_EXPORT WebV8Features {
+@@ -52,6 +52,8 @@ class BLINK_EXPORT WebV8Features {
    static void EnableUnboundedElement(v8::Local<v8::Context>,
-                                      bool is_privileged = false);
+                                      UnboundedElementPrivilege);
  
 +  static void EnableGlobalPrivacyControl(v8::Local<v8::Context>, bool);
 +
@@ -337,7 +337,7 @@
    // update that bool, indicating that MojoJS is allowed to be enabled for any
 --- a/third_party/blink/renderer/core/context_features/context_feature_settings.h
 +++ b/third_party/blink/renderer/core/context_features/context_feature_settings.h
-@@ -72,6 +72,14 @@ class CORE_EXPORT ContextFeatureSettings
+@@ -71,6 +71,14 @@ class CORE_EXPORT ContextFeatureSettings
    }
    bool isUnboundedElementEnabled() const;
  
@@ -352,17 +352,17 @@
    void Trace(Visitor*) const override;
  
   private:
-@@ -80,6 +88,7 @@ class CORE_EXPORT ContextFeatureSettings
-   bool enable_private_aggregation_in_shared_storage_ = false;
+@@ -79,6 +87,7 @@ class CORE_EXPORT ContextFeatureSettings
    bool enable_unbounded_element_ = false;
-   bool enable_unbounded_element_privileged_ = false;
+   UnboundedElementPrivilege unbounded_element_privilege_ =
+       UnboundedElementPrivilege::kNone;
 +  bool enable_global_privacy_control_ = false;
  };
  
  }  // namespace blink
 --- a/third_party/blink/renderer/core/exported/web_v8_features.cc
 +++ b/third_party/blink/renderer/core/exported/web_v8_features.cc
-@@ -107,6 +107,18 @@ void WebV8Features::EnableUnboundedEleme
+@@ -108,6 +108,18 @@ void WebV8Features::EnableUnboundedEleme
  }
  
  // static
@@ -408,7 +408,7 @@
  #include "third_party/blink/renderer/core/execution_context/agent.h"
  #include "third_party/blink/renderer/core/inspector/worker_thread_debugger.h"
  #include "third_party/blink/renderer/core/origin_trials/origin_trial_context.h"
-@@ -287,6 +289,12 @@ void WorkerOrWorkletScriptController::Pr
+@@ -263,6 +265,12 @@ void WorkerOrWorkletScriptController::Pr
  
    v8::HandleScope handle_scope(isolate_);
  

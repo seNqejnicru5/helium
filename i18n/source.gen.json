@@ -660,6 +660,78 @@
     "message": "Force context menu with Shift+Right Click"
   },
   {
+    "name": "IDS_TAB_CXMENU_RETURN_TO_PINNED_URL",
+    "source": "chrome/app/generated_resources.grd",
+    "context": "The label of the Tab context menu item that navigates a pinned tab back to the URL it was pinned at.",
+    "message": "Return to pinned URL"
+  },
+  {
+    "name": "IDS_TAB_CXMENU_USE_CURRENT_URL_AS_PINNED_URL",
+    "source": "chrome/app/generated_resources.grd",
+    "context": "The label of the Tab context menu item that makes the current URL of a pinned tab the URL it returns to.",
+    "message": "Use current URL as pinned URL"
+  },
+  {
+    "name": "IDS_TAB_CXMENU_RETURN_TO_PINNED_URL",
+    "source": "chrome/app/generated_resources.grd",
+    "context": "In Title Case: The label of the Tab context menu item that navigates a pinned tab back to the URL it was pinned at.",
+    "message": "Return to Pinned URL"
+  },
+  {
+    "name": "IDS_TAB_CXMENU_USE_CURRENT_URL_AS_PINNED_URL",
+    "source": "chrome/app/generated_resources.grd",
+    "context": "In Title Case: The label of the Tab context menu item that makes the current URL of a pinned tab the URL it returns to.",
+    "message": "Use Current URL as Pinned URL"
+  },
+  {
+    "name": "IDS_SETTINGS_KEEP_PINS",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label for the toggle which makes all windows and sessions keep the same pinned tabs.",
+    "message": "Keep pinned tabs across windows and sessions"
+  },
+  {
+    "name": "IDS_SETTINGS_KEEP_PINS_DESCRIPTION",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Description for the toggle which makes all windows and sessions keep the same pinned tabs.",
+    "message": "Pinned tabs show up in every window and stay pinned when closed. When disabled, each window keeps its own pinned tabs."
+  },
+  {
+    "name": "IDS_SETTINGS_SUGGEST_PREF_DESC_HELIUM",
+    "source": "chrome/app/settings_chromium_strings.grdp",
+    "context": "The description of the checkbox to enable/disable sending omnibox input to the user's default search engine to get additional suggestions.",
+    "message": "When you type in the address bar, Helium sends what you type to your default search engine to get suggestions. This is off in Incognito."
+  },
+  {
+    "name": "IDS_SETTINGS_ADDRESS_BAR",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Title of the settings page section which holds the address bar suggestion options.",
+    "message": "Address bar"
+  },
+  {
+    "name": "IDS_SETTINGS_LOCAL_SUGGESTIONS",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Title of the subsection holding the options for suggestions that are generated locally.",
+    "message": "Local suggestions"
+  },
+  {
+    "name": "IDS_SETTINGS_LOCAL_SUGGESTIONS_SHOW_HISTORY",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label for the option to include browsing history in the locally generated address bar suggestions.",
+    "message": "Show browsing history"
+  },
+  {
+    "name": "IDS_SETTINGS_LOCAL_SUGGESTIONS_SHOW_BOOKMARKS",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label for the option to include bookmarks in the locally generated address bar suggestions.",
+    "message": "Show bookmarks"
+  },
+  {
+    "name": "IDS_SETTINGS_SUGGEST_PREF_HELIUM",
+    "source": "chrome/app/shared_settings_strings.grdp",
+    "context": "The label of the checkbox to enable/disable sending omnibox input to the user's default search engine to get additional suggestions.",
+    "message": "Suggestions from the search engine"
+  },
+  {
     "name": "IDS_SETTINGS_PERMISSIONS_DESCRIPTION_NORMAL",
     "source": "chrome/app/settings_strings.grdp",
     "context": "Description of the controls available on the permissions and site content settings page",
@@ -670,18 +742,6 @@
     "source": "chrome/app/settings_strings.grdp",
     "context": "Description of the section on the Cookies settings page that lets users manage which sites are allowed to use third-party cookies. Explains how to use a wildcard to create an exception for an entire domain.",
     "message": "Affects the sites listed here. Inserting “[*.]” before a domain name creates an exception for the entire domain. For example, adding “[*.]example.com” means that third-party cookies can also be active for second.example.com, because it’s part of example.com."
-  },
-  {
-    "name": "IDS_SETTINGS_SUGGEST_PREF_DESC_HELIUM",
-    "source": "chrome/app/settings_chromium_strings.grdp",
-    "context": "The description of the checkbox to enable/disable sending omnibox input to the user's default search engine to get additional suggestions.",
-    "message": "When you type in the address bar, Helium sends what you type to your default search engine to get suggestions. This is off in Incognito."
-  },
-  {
-    "name": "IDS_SETTINGS_SUGGEST_PREF_HELIUM",
-    "source": "chrome/app/shared_settings_strings.grdp",
-    "context": "The label of the checkbox to enable/disable sending omnibox input to the user's default search engine to get additional suggestions.",
-    "message": "Suggestions from the search engine"
   },
   {
     "name": "IDS_SETTINGS_AUTO_PIN_NEW_TAB_GROUPS_HELIUM",
@@ -809,6 +869,24 @@
     "source": "chrome/app/settings_strings.grdp",
     "context": "macOS-only link on the browser shortcuts Settings page that opens the system keyboard shortcuts settings.",
     "message": "System Settings &gt; Keyboard &gt; Keyboard Shortcuts &gt; App Shortcuts"
+  },
+  {
+    "name": "IDS_SETTINGS_CLEAR_BROWSING_DATA_NOW_TAB",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label of the tab in the delete browsing data dialog that lets the user delete browsing data right away.",
+    "message": "Delete now"
+  },
+  {
+    "name": "IDS_SETTINGS_CLEAR_BROWSING_DATA_ON_EXIT_TAB",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label of the tab in the delete browsing data dialog that lets the user choose which browsing data is deleted when they close the last window of the profile.",
+    "message": "Delete on exit"
+  },
+  {
+    "name": "IDS_SETTINGS_CLEAR_BROWSING_DATA_ON_EXIT_DESCRIPTION",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Description shown above the list of data types in the 'Delete on exit' tab of the delete browsing data dialog.",
+    "message": "Selected data is deleted when you close the last window of this profile."
   },
   {
     "name": "IDS_SETTINGS_HELIUM_CRASH_REPORTING_TITLE",
@@ -955,6 +1033,60 @@
     "message": "Warn about insecure public sites"
   },
   {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_WEB_PUSH",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Toggle for receiving web push notifications",
+    "message": "Allow receiving push notifications"
+  },
+  {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_WEB_PUSH_DESCRIPTION",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Description of the toggle for receiving web push notifications",
+    "message": "Websites you allow to send notifications can deliver them through a push server, even when they aren't open. Helium only connects to the push server while at least one website is subscribed. Push messages are end-to-end encrypted. When disabled, websites can't subscribe to push notifications."
+  },
+  {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_PUSH_SERVER_HELIUM",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Radio button for using the default Helium push server",
+    "message": "Helium push server"
+  },
+  {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_PUSH_SERVER_CUSTOM",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Radio button for using a custom push server",
+    "message": "Other"
+  },
+  {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_PUSH_SERVER_ARIA_LABEL",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "ARIA label of the text input for a custom push server",
+    "message": "Custom push server URL"
+  },
+  {
+    "name": "IDS_SETTINGS_HELIUM_SERVICES_PUSH_SERVER_INVALID",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Validation error shown when the custom push server URL is invalid.",
+    "message": "Invalid push server URL"
+  },
+  {
+    "name": "IDS_SETTINGS_UI_DENSITY",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label for the dropdown that controls the density of the browser UI, such as the size of tabs, toolbar buttons and the address bar.",
+    "message": "Interface density"
+  },
+  {
+    "name": "IDS_SETTINGS_UI_DENSITY_DEFAULT",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Default option in the interface density dropdown, which uses the default compact sizes.",
+    "message": "Default"
+  },
+  {
+    "name": "IDS_SETTINGS_UI_DENSITY_SPACIOUS",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Spacious option in the interface density dropdown, which makes tabs, toolbar buttons and the address bar larger.",
+    "message": "Spacious"
+  },
+  {
     "name": "IDS_SETTINGS_HIBERNATED_APPEARANCE_LABEL",
     "source": "chrome/app/settings_strings.grdp",
     "context": "Label for a performance setting that controls whether hibernated tabs are visually differentiated.",
@@ -977,6 +1109,30 @@
     "source": "chrome/app/settings_strings.grdp",
     "context": "Label for the toggle which enables or disables a rounded frame around web contents.",
     "message": "Show a rounded frame around web contents"
+  },
+  {
+    "name": "IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "The label of the check-box that enables the prompt to translate a page.",
+    "message": "Offer to translate pages"
+  },
+  {
+    "name": "IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "The sublabel of the check-box that enables the prompt to translate a page.",
+    "message": "When on, Helium will offer to translate sites into your preferred language. It can also automatically translate sites."
+  },
+  {
+    "name": "IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL_WITH_PDF",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "The sublabel of the check-box that enables the prompt to translate a page or PDF.",
+    "message": "When on, Helium will offer to translate sites and PDFs into your preferred language. It can also automatically translate sites."
+  },
+  {
+    "name": "IDS_SETTINGS_TRANSLATE_PAGE_TITLE",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Name of the settings page which displays translate preferences.",
+    "message": "Translate"
   },
   {
     "name": "IDS_DOWNLOAD_BUBBLE_INTERRUPTED_SUBPAGE_SUMMARY_HELIUM_SERVICES_DISABLED",
@@ -1097,6 +1253,12 @@
     "source": "chrome/app/settings_strings.grdp",
     "context": "Label for the toggle that displays vertical tabs on the right side of the browser window.",
     "message": "Show vertical tabs on right side"
+  },
+  {
+    "name": "IDS_SETTINGS_HORIZONTAL_TAB_SCROLL_BUTTONS",
+    "source": "chrome/app/settings_strings.grdp",
+    "context": "Label for the toggle that shows scroll buttons in the horizontal tab strip when unpinned tabs overflow it.",
+    "message": "Show scroll buttons when tabs don't fit"
   },
   {
     "name": "IDS_BROWSER_LAYOUT_MENU",
@@ -1319,6 +1481,18 @@
     "source": "chrome/app/settings_strings.grdp",
     "context": "Label for the toggle that shows loading progress in the address bar.",
     "message": "Show loading progress in the address bar"
+  },
+  {
+    "name": "IDS_HELIUM_APPROVE_UPDATE_MENU_ITEM",
+    "source": "chrome/app/chromium_strings.grd",
+    "context": "App menu item that installs a Helium update that couldn't be installed automatically. macOS may ask for an administrator password. Mac-only.",
+    "message": "Update Helium"
+  },
+  {
+    "name": "IDS_HELIUM_APPROVE_UPDATE_STATUS",
+    "source": "chrome/app/chromium_strings.grd",
+    "context": "Status on the About page when a Helium update is waiting for the user to install it from the app menu. Mac-only.",
+    "message": "Version <ph name=\"VERSION\">$1<ex>0.22.1.1</ex></ph> needs your approval to install. Choose \"Update Helium\" in the menu to continue."
   },
   {
     "name": "IDS_CONTENT_CONTEXT_SYSTEM_TRANSLATE",

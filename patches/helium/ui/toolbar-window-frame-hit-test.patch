@@ -1,6 +1,6 @@
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
-@@ -4705,6 +4705,12 @@ views::CloseRequestResult BrowserView::O
+@@ -4731,6 +4731,12 @@ views::CloseRequestResult BrowserView::O
  
  int BrowserView::NonClientHitTest(const gfx::Point& point) {
  #if BUILDFLAG(IS_MAC)
@@ -13,7 +13,7 @@
    // The top container while in immersive fullscreen on macOS lives in another
    // Widget (OverlayWidgetMac). This means that BrowserView does not need to
    // consult BrowserViewLayout::NonClientHitTest() to calculate the hit test.
-@@ -4765,6 +4771,18 @@ int BrowserView::NonClientHitTest(const
+@@ -4801,6 +4807,18 @@ int BrowserView::NonClientHitTest(const
      }
    }
  
@@ -34,7 +34,7 @@
    if (IsWindowControlsOverlayEnabled() && GetActiveWebContents()) {
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-@@ -220,38 +220,6 @@ constexpr int kLargeSpaceBetweenButtons
+@@ -225,38 +225,6 @@ constexpr int kLargeSpaceBetweenButtons
  constexpr int kInsideBorderAroundGlicButtons = 2;
  constexpr int kGlicButtonMargin = 5;
  

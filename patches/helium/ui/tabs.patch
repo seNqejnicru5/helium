@@ -1,6 +1,6 @@
 --- a/chrome/browser/ui/tabs/tab_style.cc
 +++ b/chrome/browser/ui/tabs/tab_style.cc
-@@ -19,13 +19,18 @@ namespace {
+@@ -19,13 +19,33 @@ namespace {
  
  // Thickness in DIPs of the separator painted on the left and right edges of
  // the tab.
@@ -16,32 +16,52 @@
 +// The standard tab width is 190 DIP, excluding separators and overlap.
 +constexpr int kTabWidth = 190;
 +
++// Spacious density uses the upstream tab width.
++constexpr int kSpaciousTabWidth = 232;
++
 +// Split tabs need more space to be readable.
 +constexpr int kSplitTabWidth = 250;
 +
 +constexpr int kTabHorizontalPadding = 2;
++
++// The horizontal distance from the tab bounds to the visible tab shape, see
++// HorizontalTabStyleViews::GetPath().
++constexpr int kTabShapeHorizontalInset = 4;
++
++// The horizontal padding of the tab contents. Spacious density matches the
++// padding of vertical tabs.
++int GetTabHorizontalPadding() {
++  return IsSpaciousUiDensity()
++             ? GetLayoutConstant(LayoutConstant::kTabHorizontalPadding)
++             : kTabHorizontalPadding;
++}
  
  }  // namespace
  
-@@ -39,7 +44,7 @@ int TabStyle::GetStandardWidth(const boo
+@@ -39,10 +59,11 @@ int TabStyle::GetStandardWidth(const boo
    if (is_split) {
      // Split tabs appear as half width with one bottom extension. They also must
      // include half the tab overlap as the tabs fill the space between them.
--    return kTabWidth / 2 + GetBottomCornerRadius() + GetTabOverlap() / 2;
-+    return kSplitTabWidth / 2 + GetBottomCornerRadius() + GetTabOverlap() / 2;
+-    return kTabWidth / 2 + GetBottomExtensionWidth() + GetTabOverlap() / 2;
++    return kSplitTabWidth / 2 + GetBottomExtensionWidth() + GetTabOverlap() / 2;
    } else {
-     // The full width includes two extensions with the bottom corner radius.
-     return kTabWidth + 2 * GetBottomCornerRadius();
-@@ -76,7 +81,7 @@ int TabStyle::GetMinimumActiveWidth(cons
+     // The full width includes two extensions widths.
+-    return kTabWidth + 2 * GetBottomExtensionWidth();
++    const int width = IsSpaciousUiDensity() ? kSpaciousTabWidth : kTabWidth;
++    return width + 2 * GetBottomExtensionWidth();
+   }
+ }
+ 
+@@ -76,7 +97,7 @@ int TabStyle::GetMinimumActiveWidth(cons
    if (is_split) {
      // Only have one set of horizontal padding between tabs in an active split.
      return min_active_width -
 -           GetLayoutConstant(LayoutConstant::kTabHorizontalPadding) / 2;
-+           kTabHorizontalPadding / 2;
++           GetTabHorizontalPadding() / 2;
    }
  
    return min_active_width;
-@@ -95,11 +100,11 @@ int TabStyle::GetMinimumInactiveWidth()
+@@ -95,11 +116,11 @@ int TabStyle::GetMinimumInactiveWidth()
  }
  
  int TabStyle::GetTopCornerRadius() const {
@@ -54,8 +74,8 @@
 +  return 8;
  }
  
- int TabStyle::GetTabOverlap() const {
-@@ -136,9 +141,14 @@ std::tuple<float, float, float, SkColor>
+ int TabStyle::GetBottomExtensionWidth() const {
+@@ -140,9 +161,14 @@ std::tuple<float, float, float, SkColor>
    const SkColor inactive_bg =
        GetTabBackgroundColor(TabStyle::TabSelectionState::kInactive,
                              /*hovered=*/false, frame_active, color_provider);
@@ -73,22 +93,31 @@
    };
  
    const SkColor active_bg =
-@@ -303,14 +313,12 @@ SkColor TabStyle::GetCurrentTabBackgroun
+@@ -329,15 +355,18 @@ SkColor TabStyle::GetCurrentTabBackgroun
+ }
  
  gfx::Insets TabStyle::GetContentsInsets() const {
-   return gfx::Insets::TLBR(
+-  return gfx::Insets::TLBR(
 -      GetLayoutConstant(LayoutConstant::kTabVerticalPadding) +
 -          GetLayoutConstant(LayoutConstant::kTabStripPadding),
-+      GetLayoutConstant(LayoutConstant::kTabVerticalPadding),
-       GetBottomCornerRadius() +
+-      GetBottomExtensionWidth() +
 -          GetLayoutConstant(LayoutConstant::kTabHorizontalPadding),
 -      GetLayoutConstant(LayoutConstant::kTabVerticalPadding) +
 -          GetLayoutConstant(LayoutConstant::kTabStripPadding),
-+          kTabHorizontalPadding,
-+      GetLayoutConstant(LayoutConstant::kTabVerticalPadding),
-       GetBottomCornerRadius() +
+-      GetBottomExtensionWidth() +
 -          GetLayoutConstant(LayoutConstant::kTabHorizontalPadding));
-+          kTabHorizontalPadding);
++  int vertical_padding = GetLayoutConstant(LayoutConstant::kTabVerticalPadding);
++  int horizontal_padding = GetBottomExtensionWidth();
++  if (IsSpaciousUiDensity()) {
++    // Spacious density uses the upstream vertical padding, which includes the
++    // tab strip padding, and measures the horizontal padding from the visible
++    // tab shape, like vertical tabs.
++    vertical_padding += GetLayoutConstant(LayoutConstant::kTabStripPadding);
++    horizontal_padding = kTabShapeHorizontalInset;
++  }
++  horizontal_padding += GetTabHorizontalPadding();
++  return gfx::Insets::TLBR(vertical_padding, horizontal_padding,
++                           vertical_padding, horizontal_padding);
  }
  
  float TabStyle::GetSelectedTabOpacity() const {
@@ -172,7 +201,7 @@
    gfx::Insets insets =
        gfx::Insets::TLBR(
            0, 0, GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap), 0) +
-@@ -664,19 +617,6 @@ float HorizontalTabStyleViews::GetHoverO
+@@ -664,25 +617,13 @@ float HorizontalTabStyleViews::GetHoverO
  }
  
  int HorizontalTabStyleViews::GetStrokeThickness() const {
@@ -192,7 +221,16 @@
    return 0;
  }
  
-@@ -789,7 +729,7 @@ void HorizontalTabStyleViews::PaintTabBa
+ SkPath HorizontalTabStyleViews::GetOverlinePath(float scale) const {
+-  return GetPath(TabStyle::PathType::kBorder, scale,
+-                 {.should_paint_extension = false});
++  // Tabs are detached from the toolbar, so the tab group line stays below the
++  // active tab instead of going over it.
++  return SkPath();
+ }
+ 
+ bool HorizontalTabStyleViews::ShouldPaintTabBackgroundColor(
+@@ -789,7 +730,7 @@ void HorizontalTabStyleViews::PaintTabBa
      cc::PaintFlags flags;
      flags.setAntiAlias(true);
  
@@ -201,7 +239,7 @@
      canvas->DrawRect(gfx::ScaleToEnclosingRect(
                           delegate_->GetView()->GetLocalBounds(), scale),
                       flags);
-@@ -811,9 +751,6 @@ void HorizontalTabStyleViews::PaintTabBa
+@@ -811,9 +752,6 @@ void HorizontalTabStyleViews::PaintTabBa
                                               browser_view, image);
    }
  
@@ -213,7 +251,7 @@
  void HorizontalTabStyleViews::PaintBackgroundHover(gfx::Canvas* canvas,
 --- a/chrome/browser/ui/views/tabs/tab.cc
 +++ b/chrome/browser/ui/views/tabs/tab.cc
-@@ -114,10 +114,7 @@ namespace {
+@@ -115,10 +115,7 @@ namespace {
  // transitioning a tab from normal to pinned tab.
  constexpr int kPinnedTabExtraWidthToRenderAsNormal = 30;
  
@@ -225,7 +263,7 @@
  
  bool g_show_hover_card_on_mouse_hover = true;
  
-@@ -512,7 +509,10 @@ void Tab::Layout(PassKey) {
+@@ -520,7 +517,10 @@ void Tab::Layout(PassKey) {
  
    // The bounds for the favicon will include extra width for the attention
    // indicator, but visually it will be smaller at kFaviconSize wide.
@@ -237,7 +275,7 @@
    if (showing_icon_) {
      if (center_icon_) {
        // When centering the favicon, the favicon is allowed to escape the normal
-@@ -569,19 +569,15 @@ void Tab::Layout(PassKey) {
+@@ -577,19 +577,15 @@ void Tab::Layout(PassKey) {
    }
    close_button_->SetVisible(showing_close_button_);
  
@@ -262,7 +300,7 @@
          contents_rect.y() + Center(contents_rect.height(), image_size.height()),
          image_size.width(), image_size.height());
      if (center_icon_) {
-@@ -592,6 +588,7 @@ void Tab::Layout(PassKey) {
+@@ -600,6 +596,7 @@ void Tab::Layout(PassKey) {
        MaybeAdjustLeftForPinnedTab(&bounds, bounds.width());
      }
      alert_indicator_button_->SetBoundsRect(bounds);
@@ -270,7 +308,7 @@
    }
    alert_indicator_button_->UpdateAlertIndicatorAnimation();
    alert_indicator_button_->SetVisible(showing_alert_indicator_);
-@@ -605,7 +602,9 @@ void Tab::Layout(PassKey) {
+@@ -613,7 +610,9 @@ void Tab::Layout(PassKey) {
  
    if (show_title) {
      int title_left = start;
@@ -281,7 +319,7 @@
        // When computing the spacing from the favicon, don't count the actual
        // icon view width (which will include extra room for the alert
        // indicator), but rather the normal favicon width which is what it will
-@@ -616,9 +615,7 @@ void Tab::Layout(PassKey) {
+@@ -624,9 +623,7 @@ void Tab::Layout(PassKey) {
        title_left = std::max(title_left, after_favicon);
      }
      int title_right = contents_rect.right();
@@ -292,7 +330,7 @@
        // Allow the title to overlay the close button's empty border padding.
        title_right = close_x - after_title_padding;
      }
-@@ -1363,7 +1360,7 @@ void Tab::UpdateIconVisibility() {
+@@ -1372,7 +1369,7 @@ void Tab::UpdateIconVisibility() {
    const int close_button_width =
        GetLayoutConstant(LayoutConstant::kTabCloseButtonSize) +
        GetLayoutConstant(LayoutConstant::kTabAfterTitlePadding);
@@ -301,16 +339,16 @@
        available_width >= (touch_ui ? kTouchMinimumContentsWidthForCloseButtons
                                     : kMinimumContentsWidthForCloseButtons);
  
-@@ -1422,7 +1419,7 @@ void Tab::UpdateIconVisibility() {
+@@ -1434,7 +1431,7 @@ void Tab::UpdateIconVisibility() {
      }
  
      showing_close_button_ =
 -        should_show_close_button && large_enough_for_close_button &&
 +        !closing_ && should_show_close_button && large_enough_for_close_button &&
          !(declutter_eligible &&
+           features::kTabStripDeclutterInactiveTabCloseHideEnabled.Get() &&
            available_width <=
-               TabStyle::kTabStripDeclutterMaxTabWidthForCloseHide);
-@@ -1456,10 +1453,6 @@ void Tab::UpdateIconVisibility() {
+@@ -1469,10 +1466,6 @@ void Tab::UpdateIconVisibility() {
        center_icon_ = true;
      }
    }
@@ -321,7 +359,7 @@
  }
  
  bool Tab::ShouldRenderAsNormalTab() const {
-@@ -1479,15 +1472,29 @@ void Tab::UpdateTabIconAttention() {
+@@ -1492,15 +1485,29 @@ void Tab::UpdateTabIconAttention() {
  }
  
  int Tab::GetWidthOfLargestSelectableRegion() const {
@@ -412,40 +450,79 @@
  BEGIN_METADATA(TabGroupHighlight)
 --- a/chrome/browser/ui/views/tabs/tab/tab_close_button.cc
 +++ b/chrome/browser/ui/views/tabs/tab/tab_close_button.cc
-@@ -42,6 +42,8 @@ gfx::Size GetButtonSize() {
+@@ -42,6 +42,15 @@ gfx::Size GetButtonSize() {
    return gfx::Size(button_size, button_size);
  }
  
 +const gfx::Insets kInkDropInsets = gfx::Insets::VH(1, 0);
 +constexpr int kCornerRadius = 4;
++
++// Spacious density uses the whole button, including its padding, as the hit
++// target and the highlight. The button is square, so keep the highlight square
++// too.
++gfx::Insets GetInkDropInsets() {
++  return IsSpaciousUiDensity() ? gfx::Insets(1) : kInkDropInsets;
++}
  }  // namespace
  
  TabCloseButton::TabCloseButton(PressedCallback pressed_callback,
-@@ -76,8 +78,9 @@ TabCloseButton::TabCloseButton(PressedCa
+@@ -76,9 +85,10 @@ TabCloseButton::TabCloseButton(PressedCa
    // but needs to be explicitly mirrored for RTL.
    // TODO(http://crbug.com/40120351): Make ink drops in RTL work the same way as
    // focus rings.
 +
    auto ink_drop_highlight_path =
 -      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
-+      std::make_unique<views::RoundRectHighlightPathGenerator>(kInkDropInsets, kCornerRadius);
-   ink_drop_highlight_path->set_use_contents_bounds(true);
+-  ink_drop_highlight_path->set_use_contents_bounds(true);
++      std::make_unique<views::RoundRectHighlightPathGenerator>(GetInkDropInsets(), kCornerRadius);
++  ink_drop_highlight_path->set_use_contents_bounds(!IsSpaciousUiDensity());
    ink_drop_highlight_path->set_use_mirrored_rect(true);
    views::HighlightPathGenerator::Install(this,
-@@ -87,7 +90,7 @@ TabCloseButton::TabCloseButton(PressedCa
+                                          std::move(ink_drop_highlight_path));
+@@ -87,8 +97,8 @@ TabCloseButton::TabCloseButton(PressedCa
    // TODO(http://crbug.com/40120351): Once this bug is solved and explicit
    // mirroring for ink drops is not needed, we can combine these two.
    auto ring_highlight_path =
 -      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
-+      std::make_unique<views::RoundRectHighlightPathGenerator>(kInkDropInsets, kCornerRadius);
-   ring_highlight_path->set_use_contents_bounds(true);
+-  ring_highlight_path->set_use_contents_bounds(true);
++      std::make_unique<views::RoundRectHighlightPathGenerator>(GetInkDropInsets(), kCornerRadius);
++  ring_highlight_path->set_use_contents_bounds(!IsSpaciousUiDensity());
    views::FocusRing::Get(this)->SetPathGenerator(std::move(ring_highlight_path));
  
+   UpdateIcon();
+@@ -179,8 +189,10 @@ views::View* TabCloseButton::TargetForRe
+     return ViewTargeterDelegate::TargetForRect(root, rect);
+   }
+ 
+-  // Ignore the padding set on the button.
+-  gfx::Rect contents_bounds = GetMirroredRect(GetContentsBounds());
++  // Ignore the padding set on the button, except in spacious density.
++  gfx::Rect contents_bounds = IsSpaciousUiDensity()
++                                  ? GetLocalBounds()
++                                  : GetMirroredRect(GetContentsBounds());
+ 
+ #if defined(USE_AURA)
+   // Include the padding in hit-test for touch events.
+@@ -201,8 +213,12 @@ views::View* TabCloseButton::TargetForRe
+ }
+ 
+ bool TabCloseButton::GetHitTestMask(SkPath* mask) const {
+-  // We need to define this so hit-testing won't include the border region.
+-  *mask = SkPath::Rect(gfx::RectToSkRect(GetMirroredRect(GetContentsBounds())));
++  // We need to define this so hit-testing won't include the border region,
++  // except in spacious density.
++  const gfx::Rect bounds = IsSpaciousUiDensity()
++                               ? GetLocalBounds()
++                               : GetMirroredRect(GetContentsBounds());
++  *mask = SkPath::Rect(gfx::RectToSkRect(bounds));
+   return true;
+ }
+ void TabCloseButton::UpdateIcon() {
 --- a/chrome/browser/ui/views/tabs/common/tab_group_style.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_style.cc
-@@ -45,7 +45,7 @@ gfx::Point TabGroupStyle::GetTitleChipOf
-   const int total_space =
-       GetLayoutConstant(LayoutConstant::kTabStripHeight) - GetEmptyChipSize() -
+@@ -64,7 +64,7 @@ gfx::Point TabGroupStyle::GetTitleChipOf
+       GetLayoutConstant(LayoutConstant::kTabStripHeight) -
+       chip_height.value_or(GetEmptyChipSize()) -
        GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap);
 -  return gfx::Point(GetLeadingGroupHeaderPadding(), total_space / 2);
 +  return gfx::Point(TabStyle::Get()->GetTabOverlap() + 2, total_space / 2);
@@ -483,7 +560,7 @@
    }
  
    const Tab* const tab = views::AsViewClass<Tab>(sibling_view);
-   DCHECK(tab);
+   CHECK(tab, base::NotFatalUntil::M162);
  
 -  // Active tabs need the rounded bits of the underline poking out the sides.
 -  if (tab->IsActive()) {
@@ -520,19 +597,55 @@
  #include "chrome/browser/ui/tabs/tab_style.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -598,7 +599,8 @@ std::u16string_view TabGroupHeader::GetT
+@@ -640,13 +641,18 @@ std::u16string_view TabGroupHeader::GetT
  
  int TabGroupHeader::GetDesiredWidth() const {
    const int overlap_margin = group_style_->GetTabGroupViewOverlap() * 2;
--  return overlap_margin + title_chip_->width();
+-  return overlap_margin + GetUnfocusChipWidthWithGap() + title_chip_->width();
 +  const int extra_padding = 8;
-+  return overlap_margin + extra_padding + title_chip_->width();
++  return overlap_margin + extra_padding + GetUnfocusChipWidthWithGap() +
++         title_chip_->width();
  }
  
  int TabGroupHeader::GetChipHeight() const {
+   const bool is_focused =
+       is_ephemeral_ ||
+       tab_slot_controller_->GetFocusedGroup() == group().value();
++  if (!is_focused && IsSpaciousUiDensity()) {
++    return 24;
++  }
+   return is_focused ? TabGroupStyle::GetFocusedChipHeight()
+                     : TabGroupStyle::GetEmptyChipSize();
+ }
+@@ -751,15 +757,19 @@ void TabGroupHeader::UpdateIsCollapsed()
+ }
+ 
+ void TabGroupHeader::CreateHeaderWithoutTitle() {
+-  const int chip_height = GetChipHeight();
+-  const int chip_y = GetChipY();
+-  const int empty_width = chip_height;
+-  const gfx::Point empty_origin =
+-      TabGroupStyle::GetTitleChipOffset(std::nullopt);
+-
+   const bool is_focused =
+       is_ephemeral_ ||
+       tab_slot_controller_->GetFocusedGroup() == group().value();
++  const gfx::Point empty_origin =
++      TabGroupStyle::GetTitleChipOffset(std::nullopt);
++  // Unfocused empty chips stay square in spacious density.
++  const bool use_empty_chip_size = !is_focused && IsSpaciousUiDensity();
++  const int chip_height = use_empty_chip_size
++                              ? TabGroupStyle::GetEmptyChipSize()
++                              : GetChipHeight();
++  const int chip_y = use_empty_chip_size ? empty_origin.y() : GetChipY();
++  const int empty_width = chip_height;
++
+   const float radius = is_focused ? TabGroupStyle::GetFocusedChipCornerRadius()
+                                   : TabGroupStyle::GetChipCornerRadius();
+   const gfx::RoundedCornersF radii =
 --- a/media/base/media_switches.cc
 +++ b/media/base/media_switches.cc
-@@ -549,7 +549,7 @@ BASE_FEATURE(kDocumentPictureInPictureRe
+@@ -564,7 +564,7 @@ BASE_FEATURE(kDocumentPictureInPictureRe
  BASE_FEATURE(kEnableRtcpReporting, base::FEATURE_ENABLED_BY_DEFAULT);
  
  // Enables user control over muting tab audio from the tab strip.
@@ -573,7 +686,7 @@
    alert_state_ = next_state;
  
    if (previous_alert_showing_state != showing_alert_state_) {
-@@ -424,20 +405,7 @@ bool AlertIndicatorButton::IsTriggerable
+@@ -425,20 +406,7 @@ bool AlertIndicatorButton::IsTriggerable
  }
  
  void AlertIndicatorButton::PaintButtonContents(gfx::Canvas* canvas) {
@@ -596,18 +709,23 @@
  gfx::ImageSkia AlertIndicatorButton::GetImageToPaint() {
 --- a/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc
 +++ b/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc
-@@ -70,8 +70,8 @@ TabStripFlatEdgeButton::TabStripFlatEdge
-       this, std::make_unique<views::RoundRectHighlightPathGenerator>(
-                 gfx::Insets(), GetButtonCornerRadii()));
+@@ -196,13 +196,9 @@ void TabStripFlatEdgeButton::OnThemeChan
+   if (should_show_label_) {
+     UpdateLabelColor();
+   }
+-  const bool frame_active = GetWidget() && GetWidget()->ShouldPaintAsActive();
    ConfigureToolbarInkdropForRefresh2023(
--      this, kColorTabStripControlButtonInkDrop,
--      kColorTabStripControlButtonInkDropRipple);
+-      this,
+-      frame_active ? kColorTabStripControlButtonInkDrop
+-                   : kColorTabStripControlButtonInkDropFrameInactive,
+-      frame_active ? kColorTabStripControlButtonInkDropRipple
+-                   : kColorTabStripControlButtonInkDropRippleFrameInactive);
 +      this, kColorTabBackgroundInactiveHoverFrameActive,
 +      kColorTabBackgroundActiveFrameActive);
-   SetIconSize(
-       GetLayoutConstant(LayoutConstant::kVerticalTabStripComboButtonIconSize));
-   SetImageLabelSpacing(kButtonWithLabelPadding);
-@@ -279,14 +279,14 @@ void TabStripFlatEdgeButton::RemovedFrom
+ }
+ 
+ bool TabStripFlatEdgeButton::GetHitTestMask(SkPath* mask) const {
+@@ -286,14 +282,14 @@ void TabStripFlatEdgeButton::RemovedFrom
  
  ui::ColorId TabStripFlatEdgeButton::GetForegroundColor() const {
    return GetWidget() && GetWidget()->ShouldPaintAsActive()
@@ -628,7 +746,7 @@
  gfx::RoundedCornersF TabStripFlatEdgeButton::GetButtonCornerRadii() const {
 --- a/chrome/browser/ui/views/tabs/tab_strip_control_button.cc
 +++ b/chrome/browser/ui/views/tabs/tab_strip_control_button.cc
-@@ -103,15 +103,15 @@ TabStripControlButton::TabStripControlBu
+@@ -104,15 +104,15 @@ TabStripControlButton::TabStripControlBu
    SetImageCentered(true);
    SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
  
@@ -649,3 +767,175 @@
  
    UpdateIcon();
    SetHorizontalAlignment(gfx::ALIGN_CENTER);
+--- a/chrome/browser/ui/views/tabs/common/tab_view_horizontal_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view_horizontal_layout.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/common/tab_view_horizontal_layout.h"
+ 
++#include "base/command_line.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_view.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/ui_features.h"
+@@ -25,13 +26,9 @@ namespace {
+ // When the content's width of the tab shrinks to below this size we should
+ // hide the close button on inactive tabs. Any smaller and they're too easy
+ // to hit on accident.
+-static constexpr int kMinimumContentsWidthForCloseButtons = 68;
+ static constexpr int kTouchMinimumContentsWidthForCloseButtons = 100;
+ 
+-// Additional padding of close button to the right of the tab
+-// indicator when `extra_alert_indicator_padding` is true.
+-constexpr int kTabAlertIndicatorCloseButtonPaddingAdjustmentTouchUI = 8;
+-constexpr int kTabAlertIndicatorCloseButtonPaddingAdjustment = 4;
++constexpr int kIndicatorPadding = 2;
+ 
+ // Returns the coordinate for an object of size `item_size` centered in a region
+ // of size `size`, biasing towards placing any extra space ahead of the object.
+@@ -122,7 +119,10 @@ views::ProposedLayout TabViewHorizontalL
+ 
+   // The bounds for the favicon will include extra width for the attention
+   // indicator, but visually it will be smaller at kFaviconSize wide.
+-  gfx::Rect favicon_bounds(start, contents_rect.y(), 0, 0);
++  gfx::Rect favicon_bounds(
++      start,
++      contents_rect.y() + Center(contents_rect.height(), gfx::kFaviconSize),
++      0, 0);
+   if (showing_icon) {
+     if (center_icon) {
+       // When centering the favicon, the favicon is allowed to escape the normal
+@@ -180,18 +180,13 @@ views::ProposedLayout TabViewHorizontalL
+ 
+   gfx::Rect alert_indicator_bounds;
+   if (showing_alert_indicator) {
+-    int right = contents_rect.right();
+-    if (showing_close_button) {
+-      right = close_x;
+-      if (extra_alert_indicator_padding) {
+-        right -= ui::TouchUiController::Get()->touch_ui()
+-                     ? kTabAlertIndicatorCloseButtonPaddingAdjustmentTouchUI
+-                     : kTabAlertIndicatorCloseButtonPaddingAdjustment;
+-      }
++    int alert_left = start;
++    if (showing_icon) {
++      alert_left = favicon_bounds.right() + kIndicatorPadding;
+     }
+     const gfx::Size image_size = TabView().alert_indicator_->GetPreferredSize();
+     alert_indicator_bounds = gfx::Rect(
+-        std::max(contents_rect.x(), right - image_size.width()),
++        alert_left,
+         contents_rect.y() + Center(contents_rect.height(), image_size.height()),
+         image_size.width(), image_size.height());
+     if (center_icon) {
+@@ -209,7 +204,9 @@ views::ProposedLayout TabViewHorizontalL
+   gfx::Rect title_bounds;
+   if (show_title) {
+     int title_left = start;
+-    if (showing_icon) {
++    if (showing_alert_indicator) {
++      title_left = alert_indicator_bounds.right() + kIndicatorPadding;
++    } else if (showing_icon) {
+       // When computing the spacing from the favicon, don't count the actual
+       // icon view width (which will include extra room for the alert
+       // indicator), but rather the normal favicon width which is what it will
+@@ -221,11 +218,9 @@ views::ProposedLayout TabViewHorizontalL
+       title_left = std::max(title_left, after_favicon);
+     }
+     int title_right = contents_rect.right();
+-    if (showing_alert_indicator) {
+-      title_right = alert_indicator_bounds.x() - after_title_padding;
+-    } else if (showing_close_button) {
++    if (showing_close_button) {
+       // Allow the title to overlay the close button's empty border padding.
+-      title_right = close_x;
++      title_right = close_x - after_title_padding;
+     }
+     const int title_width = std::max(title_right - title_left, 0);
+     // The Label will automatically center the font's cap height within the
+@@ -300,13 +295,19 @@ TabViewHorizontalLayout::CalculateChildV
+   const bool large_enough_for_close_button =
+       available_width >= (touch_ui ? kTouchMinimumContentsWidthForCloseButtons
+                                    : kMinimumContentsWidthForCloseButtons);
++  // Inactive tabs only show the close button while hovered or focused.
++  const bool hovered_or_focused =
++      TabView().hovered_ || TabView().HasFocus() ||
++      (TabView().close_button_ && TabView().close_button_->HasFocus());
+ 
+   const bool declutter_eligible =
+       features::IsTabStripDeclutterEnabled() &&
+       !(TabView().hovered_ || TabView().HasFocus() ||
+         (TabView().close_button_ && TabView().close_button_->HasFocus()));
+ 
+-  bool should_show_close_button = true;
++  bool should_show_close_button =
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "hide-tab-close-buttons");
+ #if BUILDFLAG(IS_CHROMEOS)
+   // Hide tab close button for OnTask if locked. Only applicable for non-web
+   // browser scenarios.
+@@ -360,7 +361,8 @@ TabViewHorizontalLayout::CalculateChildV
+       available_width -= favicon_width;
+     }
+     showing_close_button =
+-        should_show_close_button && large_enough_for_close_button &&
++        !TabView().IsClosing() && should_show_close_button &&
++        hovered_or_focused && large_enough_for_close_button &&
+         !(declutter_eligible &&
+           features::kTabStripDeclutterInactiveTabCloseHideEnabled.Get() &&
+           available_width <=
+@@ -377,13 +379,13 @@ TabViewHorizontalLayout::CalculateChildV
+       showing_icon = !showing_alert_indicator && has_favicon;
+ 
+       // See comments near top of function on why this conditional is here.
+-      if (showing_alert_indicator || showing_icon) {
++      if (!TabView().IsClosing() && (showing_alert_indicator || showing_icon)) {
+         center_icon = true;
+       }
+     }
+   }
+ 
+-  if (features::IsTabStripDeclutterEnabled()) {
++  if (!TabView().IsClosing() && features::IsTabStripDeclutterEnabled()) {
+     const int max_width_to_center_icon =
+         GetLayoutConstant(LayoutConstant::kTabPreTitlePadding) +
+         GetLayoutConstant(LayoutConstant::kTabAfterTitlePadding);
+--- a/chrome/browser/ui/views/tabs/common/tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
+@@ -538,6 +538,9 @@ SkPath TabView::GetPath() const {
+ void TabView::Layout(PassKey) {
+   LayoutSuperclass<views::View>(this);
+   alert_indicator_->UpdateAlertIndicatorAnimation();
++  // Click-to-mute depends on the tab width and the close button, which can
++  // change without moving the alert indicator on the leading edge.
++  alert_indicator_->UpdateEnabledForMuteToggle();
+   if (orientation_ == TabStripOrientation::kHorizontal) {
+     icon_->ResizeDiscardIndicatorRadiusForWidth(
+         width() - 2 * tab_styling()->tab_style()->GetBottomExtensionWidth());
+@@ -979,7 +982,13 @@ bool TabView::ShouldEnableMuteToggle(int
+     return false;
+   }
+ 
+-  return alert_indicator_->x() >= required_width;
++  // The alert indicator is on the leading edge, after the favicon. Measure
++  // the selectable title area between it and the trailing close button (or
++  // the tab edge when the close button is hidden).
++  const int selectable_region_end =
++      close_button_->GetVisible() ? close_button_->x() : width();
++  return selectable_region_end - alert_indicator_->bounds().right() >=
++         required_width;
+ }
+ 
+ void TabView::ToggleTabAudioMute() {
+--- a/chrome/browser/ui/views/tabs/common/tab_view_horizontal_layout.h
++++ b/chrome/browser/ui/views/tabs/common/tab_view_horizontal_layout.h
+@@ -10,6 +10,10 @@
+ class TabViewHorizontalLayout : public TabView::LayoutManager,
+                                 public gfx::AnimationDelegate {
+  public:
++  // Inactive tabs hide the close button when their contents are narrower than
++  // this.
++  static constexpr int kMinimumContentsWidthForCloseButtons = 56;
++
+   TabViewHorizontalLayout();
+   TabViewHorizontalLayout(const TabViewHorizontalLayout&) = delete;
+   TabViewHorizontalLayout& operator=(const TabViewHorizontalLayout&) = delete;

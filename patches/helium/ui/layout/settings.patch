@@ -1,6 +1,6 @@
 --- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
 +++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -218,6 +218,11 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
+@@ -222,6 +222,11 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
    }
    s_allowlist = new PrefsUtil::TypedPrefMap();
  
@@ -14,7 +14,7 @@
        settings_api::PrefType::kBoolean;
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -271,6 +271,27 @@
+@@ -342,6 +342,30 @@
      <message name="IDS_SETTINGS_ROUNDED_FRAME" desc="Label for the toggle which enables or disables a rounded frame around web contents.">
        Show a rounded frame around web contents
      </message>
@@ -39,12 +39,15 @@
 +    <message name="IDS_SETTINGS_TAB_STRIP_RIGHT_ALIGN" desc="Label for the toggle that displays vertical tabs on the right side of the browser window.">
 +      Show vertical tabs on right side
 +    </message>
++    <message name="IDS_SETTINGS_HORIZONTAL_TAB_SCROLL_BUTTONS" desc="Label for the toggle that shows scroll buttons in the horizontal tab strip when unpinned tabs overflow it.">
++      Show scroll buttons when tabs don't fit
++    </message>
      <message name="IDS_SETTINGS_SHOW_HOME_BUTTON" desc="Label for the checkbox which enables or disables showing the home button in the toolbar.">
        Show home button
      </message>
 --- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -607,6 +607,13 @@ void AddAppearanceStrings(content::WebUI
+@@ -638,6 +638,13 @@ void AddAppearanceStrings(content::WebUI
        {"openNewTabNextToActive", IDS_SETTINGS_NEW_TAB_NEXT_TO_ACTIVE_BUTTON},
        {"cycleTabsInMRUOrder", IDS_SETTINGS_CYCLE_TABS_IN_MRU_ORDER},
        {"roundedFrame", IDS_SETTINGS_ROUNDED_FRAME},
@@ -58,9 +61,19 @@
        {"shiftRightClickContextMenu",
         IDS_SETTINGS_SHIFT_RIGHT_CLICK_CONTEXT_MENU},
        {"showHomeButton", IDS_SETTINGS_SHOW_HOME_BUTTON},
+@@ -650,7 +657,8 @@ void AddAppearanceStrings(content::WebUI
+       {"showTabSearchButton", IDS_SETTINGS_SHOW_TAB_SEARCH_BUTTON},
+       {"showEverythingMenuButton", IDS_SETTINGS_SHOW_EVERYTHING_MENU_BUTTON},
+       {"tabStripPosition", IDS_SETTINGS_TAB_STRIP_POSITION},
+-      {"tabScrollAutoShowOnOverflow", IDS_TAB_SCROLL_AUTO_SHOW_ON_OVERFLOW},
++      {"tabScrollAutoShowOnOverflow",
++       IDS_SETTINGS_HORIZONTAL_TAB_SCROLL_BUTTONS},
+       {"showVerticalTabsExpandOnHover",
+        IDS_SETTINGS_VERTICAL_TABS_EXPAND_ON_HOVER},
+       {"allowSplitViewDragAndDrop",
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-@@ -143,7 +143,6 @@ export class SettingsAppearancePageEleme
+@@ -149,7 +149,6 @@ export class SettingsAppearancePageEleme
        sidePanelIsRightAlignedPref_: {type: Object},
        themeIdPref_: {type: Object},
        themePolicyColorPref_: {type: Object},
@@ -68,7 +81,7 @@
  
        // <if expr="is_linux">
        themeSystemThemePref_: {type: Object},
-@@ -210,8 +209,6 @@ export class SettingsAppearancePageEleme
+@@ -215,8 +214,6 @@ export class SettingsAppearancePageEleme
    protected accessor themeIdPref_: PrefObject<string>|undefined = undefined;
    protected accessor themePolicyColorPref_: PrefObject<number>|undefined =
        undefined;
@@ -77,7 +90,7 @@
  
    // <if expr="is_linux">
    protected accessor themeSystemThemePref_: PrefObject<number>|undefined =
-@@ -341,7 +338,6 @@ export class SettingsAppearancePageEleme
+@@ -344,7 +341,6 @@ export class SettingsAppearancePageEleme
        'side_panel.alignment_overrides': 'sidePanelAlignmentOverridesPref_',
        'side_panel.is_right_aligned': 'sidePanelIsRightAlignedPref_',
        'toolbar.pinned_actions': 'pinnedActionsPref_',
@@ -85,7 +98,7 @@
        'webkit.webprefs.default_font_size': 'defaultFontSizePref_',
      });
  
-@@ -686,15 +682,6 @@ export class SettingsAppearancePageEleme
+@@ -702,14 +698,6 @@ export class SettingsAppearancePageEleme
      this.appearanceBrowserProxy_.recordHoverCardMemoryUsageEnabledChanged(enabled);
    }
  
@@ -94,8 +107,7 @@
 -      return false;
 -    }
 -
--    return this.showVerticalTabsExpandOnHoverEnabled_ &&
--        this.verticalTabsEnabledPref_.value;
+-    return this.verticalTabsEnabledPref_.value;
 -  }
 -
  
@@ -103,9 +115,9 @@
      this.showManagedThemeDialog_ = false;
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
-@@ -142,61 +142,6 @@ export function getHtml(this: SettingsAp
-       ` : ''}
-     </if>
+@@ -142,60 +142,6 @@ export function getHtml(this: SettingsAp
+     ` : ''}
+ </if>
  
 -
 -    <div class="cr-row">
@@ -113,27 +125,17 @@
 -        $i18n{tabStripPosition}
 -      </div>
 -      <settings-dropdown-menu id="tabStripPosition"
--          label="$i18n{tabStripPosition}"
--          pref-key="vertical_tabs.enabled"
--          .menuOptions="${this.tabStripOptions_}"
--          @settings-control-change="${this.onTabStripPositionSettingsControlChange_}">
+-          label="$i18n{tabStripPosition}" pref-key="vertical_tabs.enabled"
+-          .menuOptions="${this.tabStripOptions_}" @settings-control-change="${
+-              this.onTabStripPositionSettingsControlChange_}">
 -      </settings-dropdown-menu>
 -    </div>
 -    <div class="list-frame indented-toggles"
 -        ?hidden="${!this.verticalTabsEnabledPref_?.value}">
 -      ${this.showVerticalTabsExpandOnHoverSetting_() ? html`
--        <settings-toggle-button
--            id="showVerticalTabsExpandOnHover"
+-        <settings-toggle-button id="showVerticalTabsExpandOnHover"
 -            pref-key="vertical_tabs.expand_on_hover"
 -            label="$i18n{showVerticalTabsExpandOnHover}">
--        </settings-toggle-button>
--      ` : ''}
--
--      ${this.showOrganizerPanelEnabled_ ? html`
--        <settings-toggle-button id="showOrganizerPanelButton"
--          pref-key="organizer_panel.pinned_to_tabstrip"
--          label="$i18n{showOrganizerPanelButton}"
--          @change="${this.onShowOrganizerPanelButtonChange_}">
 -        </settings-toggle-button>
 -      ` : ''}
 -
@@ -156,18 +158,27 @@
 -      </div>
 -    ` : ''}
 -
--    <settings-toggle-button id="showTabSearchButton" class="hr"
--        pref-key="tab_search.pinned_to_tabstrip"
--        label="$i18n{showTabSearchButton}"
--        @change="${this.onShowTabSearchButtonChange_}">
--    </settings-toggle-button>
+-    ${this.showOrganizerPanelEnabled_ ? html`
+-      <settings-toggle-button id="showOrganizerPanelButton"
+-          pref-key="tab_search.pinned_to_tabstrip"
+-          label="$i18n{showTabSearchButton}"
+-          @change="${this.onShowOrganizerPanelButtonChange_}">
+-      </settings-toggle-button>
+-    ` : html`
+-      <settings-toggle-button id="showTabSearchButton" class="hr"
+-          pref-key="tab_search.pinned_to_tabstrip"
+-          label="$i18n{showTabSearchButton}"
+-          @change="${this.onShowTabSearchButtonChange_}">
+-      </settings-toggle-button>
+-    `}
+-
 -
      <settings-toggle-button class="hr" id="showSavedTabGroups"
          pref-key="bookmark_bar.show_tab_groups"
          label="$i18n{showTabGroupsInBookmarksBar}"
 --- a/chrome/browser/resources/settings/BUILD.gn
 +++ b/chrome/browser/resources/settings/BUILD.gn
-@@ -229,6 +229,8 @@ build_webui("build") {
+@@ -202,6 +202,8 @@ build_webui("build") {
      "appearance_page/appearance_browser_proxy.ts",
      "appearance_page/appearance_fonts_page.html.ts",
      "appearance_page/appearance_fonts_page.ts",
@@ -176,7 +187,7 @@
      "appearance_page/appearance_page.html.ts",
      "appearance_page/appearance_page.ts",
      "appearance_page/appearance_page_index.html.ts",
-@@ -577,6 +579,7 @@ build_webui("build") {
+@@ -594,6 +596,7 @@ build_webui("build") {
      "a11y_page/live_translate.css",
      "about_page/about_page.css",
      "appearance_page/appearance_fonts_page.css",
@@ -304,7 +315,7 @@
 +}
 --- /dev/null
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_layout_page.html.ts
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,50 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -334,6 +345,13 @@
 +      </controlled-radio-button>
 +    `)}
 +  </settings-radio-group>
++  ${this.tabStripUnificationEnabled_ ? html`
++    <settings-toggle-button class="hr" id="tabScrollAutoShowOnOverflow"
++        ?hidden="${this.showVerticalSettings_()}"
++        pref-key="tab_scroll_buttons.pinned_to_tabstrip"
++        label="$i18n{tabScrollAutoShowOnOverflow}">
++    </settings-toggle-button>
++  ` : ''}
 +  <settings-toggle-button class="hr"
 +      ?hidden="${!this.showVerticalSettings_()}"
 +      pref-key="helium.browser.vertical_right_aligned"
@@ -350,7 +368,7 @@
 +}
 --- /dev/null
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_layout_page.ts
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,114 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -406,7 +424,7 @@
 +    return {
 +      browserLayoutPref_: {type: Object},
 +      browserLayoutOptions_: {type: Array},
-+      showVerticalTabsExpandOnHoverEnabled_: {type: Boolean},
++      tabStripUnificationEnabled_: {type: Boolean},
 +    };
 +  }
 +
@@ -436,8 +454,8 @@
 +    },
 +  ];
 +
-+  protected accessor showVerticalTabsExpandOnHoverEnabled_: boolean =
-+      loadTimeData.getBoolean('showVerticalTabsExpandOnHoverEnabled');
++  protected accessor tabStripUnificationEnabled_: boolean =
++      loadTimeData.getBoolean('tabStripUnificationEnabled');
 +
 +  override connectedCallback() {
 +    super.connectedCallback();
@@ -452,8 +470,7 @@
 +  }
 +
 +  protected showVerticalTabsExpandOnHoverSetting_(): boolean {
-+    return this.showVerticalTabsExpandOnHoverEnabled_ &&
-+        this.showVerticalSettings_();
++    return this.showVerticalSettings_();
 +  }
 +}
 +

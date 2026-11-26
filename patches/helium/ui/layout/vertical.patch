@@ -1,38 +1,61 @@
 --- a/chrome/browser/ui/layout_constants.cc
 +++ b/chrome/browser/ui/layout_constants.cc
-@@ -116,7 +116,7 @@ int GetLayoutConstant(LayoutConstant con
+@@ -151,7 +151,9 @@ int GetLayoutConstant(LayoutConstant con
      case LayoutConstant::kTabVerticalPadding:
        return 6;
      case LayoutConstant::kTabHorizontalPadding:
 -      return 8;
-+      return 7;
++      // Centers the 16 DIP favicon in collapsed vertical tabs, so that it stays
++      // in place when the vertical tab strip collapses.
++      return (GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) - 16) / 2;
      case LayoutConstant::kTabStackDistance:
        return touch_ui ? 4 : 6;
      case LayoutConstant::kTabstripToolbarOverlap:
-@@ -155,15 +155,15 @@ int GetLayoutConstant(LayoutConstant con
+@@ -188,17 +190,20 @@ int GetLayoutConstant(LayoutConstant con
+     case LayoutConstant::kVerticalTabCornerRadius:
+       return 8;
      case LayoutConstant::kVerticalTabHeight:
-       return 30;
+-      return 30;
++      // Spacious density matches the height of horizontal tabs.
++      return spacious ? GetLayoutConstant(LayoutConstant::kLocationBarHeight)
++                      : 30;
      case LayoutConstant::kVerticalTabPinnedHeight:
 -      return 32;
-+      return 30;
++      // Pinned tabs are square.
++      return GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth);
      case LayoutConstant::kVerticalTabMinWidth:
 -      return 32;
-+      return 30;
++      return spacious ? 32 : 30;
      case LayoutConstant::kVerticalTabStripHorizontalPadding:
 -      return 12;
-+      return 6;
++      return GetLayoutConstant(LayoutConstant::kHeliumBasePadding) * 2;
      case LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding:
 -      return 12;
-+      return 6;
++      return spacious ? 12 : 6;
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
 -      return 8;
-+      return 6;
++      return spacious ? 8 : 6;
      case LayoutConstant::kVerticalTabStripComboButtonIconSize:
        return 18;
      case LayoutConstant::kVerticalTabStripButtonIconSize:
+@@ -306,3 +311,14 @@ gfx::Insets GetLayoutInsets(LayoutInset
+   }
+   NOTREACHED();
+ }
++
++int GetVerticalTabStripCollapsedWidth() {
++  // A collapsed tab at its minimum width, plus the tab strip padding.
++  return GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) +
++         2 * GetLayoutConstant(
++                 LayoutConstant::kVerticalTabStripHorizontalPadding);
++}
++
++int GetVerticalTabStripDefaultUncollapsedWidth() {
++  return IsSpaciousUiDensity() ? 220 : 200;
++}
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-@@ -34,7 +34,6 @@
+@@ -36,7 +36,6 @@
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/frame/custom_corners.h"
  #include "chrome/browser/ui/views/frame/custom_corners_background.h"
@@ -40,7 +63,7 @@
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout_delegate.h"
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout_impl.h"
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout_params.h"
-@@ -59,6 +58,7 @@
+@@ -60,6 +59,7 @@
  #include "ui/gfx/geometry/size.h"
  #include "ui/gfx/geometry/size_conversions.h"
  #include "ui/views/controls/separator.h"
@@ -48,7 +71,7 @@
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
  #include "ui/views/view_utils.h"
-@@ -419,9 +419,6 @@ BrowserViewTabbedLayoutImpl::CalculateHo
+@@ -470,9 +470,6 @@ BrowserViewTabbedLayoutImpl::CalculateHo
        // Collapsed tab strip always gets its preferred size.
        min_vertical_tab_strip_width = preferred_vertical_tab_strip_width;
  
@@ -58,7 +81,7 @@
      } else {
        // Minimum size is bounded from below by size of leading exclusion area.
        if (layout.vertical_tab_strip_collapsed_state ==
-@@ -435,10 +432,6 @@ BrowserViewTabbedLayoutImpl::CalculateHo
+@@ -493,10 +490,6 @@ BrowserViewTabbedLayoutImpl::CalculateHo
              vertical_tab_strip->GetMinimumSize().width();
        }
  
@@ -69,7 +92,7 @@
        // Figure out the maximum size of the vertical tabstrip that can still
        // accommodate the toolbar.
        //
-@@ -568,6 +561,7 @@ BrowserViewTabbedLayoutImpl::CalculateVe
+@@ -640,6 +633,7 @@ BrowserViewTabbedLayoutImpl::CalculateVe
        gfx::Tween::DoubleValueBetween(open_amount, 0.0, -1.0);
    const bool is_split_view = layout_data_->horizontal_layout.is_split_view;
    const bool has_infobar = delegate().IsInfobarVisible();
@@ -77,7 +100,7 @@
    std::optional<double> max_uncollapsed_top_corner;
  
    auto* const controller = delegate().GetAnimationController();
-@@ -586,8 +580,7 @@ BrowserViewTabbedLayoutImpl::CalculateVe
+@@ -658,8 +652,7 @@ BrowserViewTabbedLayoutImpl::CalculateVe
          break;
        case WindowState::kNormal:
        case WindowState::kMaximized:
@@ -87,7 +110,7 @@
            top_corner_collapsed_state =
                delegate().IsBookmarkBarVisible() || !would_have_separator
                    ? -1.0
-@@ -605,14 +598,10 @@ BrowserViewTabbedLayoutImpl::CalculateVe
+@@ -677,14 +670,10 @@ BrowserViewTabbedLayoutImpl::CalculateVe
  
    // Now that the proper default value is set, calculate all of the corner
    // animation values.
@@ -103,7 +126,7 @@
    animation.expand_on_hover_width =
        *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
                                     TabStripAnimations::kTabStripHoverWidth);
-@@ -727,23 +716,16 @@ int BrowserViewTabbedLayoutImpl::GetColl
+@@ -799,23 +788,16 @@ int BrowserViewTabbedLayoutImpl::GetColl
  
    const auto& params = layout_data_->revised_params;
  
@@ -135,7 +158,7 @@
  }
  
  gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumSize(
-@@ -811,6 +793,9 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -883,6 +865,9 @@ BrowserViewTabbedLayoutImpl::CalculatePr
    const bool infobar_visible = delegate().IsInfobarVisible();
    const bool should_use_rounded_frame =
        views().multi_contents_view->ShouldUseRoundedFrame();
@@ -143,9 +166,9 @@
 +  const bool vertical_right_aligned =
 +      delegate().IsVerticalTabStripRightAligned();
  
-   if (IsParentedTo(views().organizer_tray, views().browser_view)) {
-     const bool show_organizer_tray =
-@@ -866,18 +851,12 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+   const int target_organizer_width =
+       layout_data_->tab_strip_type == TabStripType::kHorizontal
+@@ -944,20 +929,14 @@ BrowserViewTabbedLayoutImpl::CalculatePr
    gfx::Rect unclipped_contents_region = params.visual_client_area;
  
    // Lay out vertical tab strip if visible.
@@ -162,9 +185,12 @@
 -      }
 -
        const int vertical_tab_strip_hover_width =
-           std::max(0, tabs::kVerticalTabStripDefaultUncollapsedWidth -
+-          std::max(0, tabs::kVerticalTabStripDefaultUncollapsedWidth -
++          std::max(0, GetVerticalTabStripDefaultUncollapsedWidth() -
                            horizontal_layout.vertical_tab_strip_width) *
-@@ -905,8 +884,12 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+           vertical_tab_strip_animation.expand_on_hover_width;
+ 
+@@ -983,8 +962,12 @@ BrowserViewTabbedLayoutImpl::CalculatePr
          last_vertical_tab_strip_width_ = vertical_tab_strip_width;
        }
  
@@ -178,7 +204,7 @@
                      params.visual_client_area.y() +
                          vertical_tab_strip_animation.top_offset,
                      vertical_tab_strip_width,
-@@ -927,7 +910,7 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1018,17 +1001,19 @@ BrowserViewTabbedLayoutImpl::CalculatePr
  
        const int inset_amount = horizontal_layout.vertical_tab_strip_width -
                                 GetVerticalTabStripContentOverlap();
@@ -187,14 +213,12 @@
  
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
-@@ -936,11 +919,13 @@ BrowserViewTabbedLayoutImpl::CalculatePr
-                 TabStripAnimations::kExpand ||
-             vertical_tab_strip_animation.current_motion ==
-                 TabStripAnimations::kCollapse;
--        unclipped_contents_region.Inset(gfx::Insets::TLBR(
--            0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
+         clip_content_for_animation =
+             vertical_tab_strip_animation.is_expanding_or_collapsing();
+-        unclipped_contents_region.Inset(
+-            gfx::Insets::TLBR(0, tabs::kVerticalTabStripCollapsedWidth, 0, 0));
 +        InsetHorizontal(unclipped_contents_region,
-+                        VerticalTabStripRegionView::kCollapsedWidth,
++                        GetVerticalTabStripCollapsedWidth(),
 +                        !vertical_right_aligned);
        } else {
 -        unclipped_contents_region.Inset(gfx::Insets::TLBR(
@@ -205,7 +229,7 @@
        }
      }
      layout.AddChild(views().vertical_tab_strip_region_view,
-@@ -958,52 +943,6 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1046,52 +1031,6 @@ BrowserViewTabbedLayoutImpl::CalculatePr
                  0.0f);
    }
  
@@ -213,16 +237,16 @@
 -  if (IsParentedTo(views().vertical_tab_strip_top_corner,
 -                   views().browser_view)) {
 -    gfx::Rect corner_bounds;
+-    const double top_corner = layout_data_->vertical_tabs_top_corner();
 -    const bool top_corner_visible =
 -        layout_data_->tab_strip_type == TabStripType::kVertical &&
--        vertical_tab_strip_animation.top_corner > 0.0;
+-        top_corner > 0.0;
 -
 -    // The top corner is drawn when the tabstrip goes all the way to the top.
 -    if (top_corner_visible) {
 -      auto preferred =
 -          views().vertical_tab_strip_top_corner->GetPreferredSize();
--      preferred.set_width(base::ClampCeil(
--          preferred.width() * vertical_tab_strip_animation.top_corner));
+-      preferred.set_width(base::ClampCeil(preferred.width() * top_corner));
 -      corner_bounds =
 -          gfx::Rect(vertical_tab_strip_bounds.top_right(), preferred);
 -      corner_bounds.Outset(
@@ -236,14 +260,14 @@
 -  if (IsParentedTo(views().vertical_tab_strip_bottom_corner,
 -                   views().browser_view)) {
 -    gfx::Rect corner_bounds;
+-    const double bottom_corner = layout_data_->vertical_tabs_bottom_corner();
 -    const bool bottom_corner_visible =
 -        layout_data_->tab_strip_type == TabStripType::kVertical &&
--        vertical_tab_strip_animation.bottom_corner > 0.0;
+-        bottom_corner > 0.0;
 -    if (bottom_corner_visible) {
 -      auto preferred =
 -          views().vertical_tab_strip_bottom_corner->GetPreferredSize();
--      preferred.set_width(base::ClampCeil(
--          preferred.width() * vertical_tab_strip_animation.bottom_corner));
+-      preferred.set_width(base::ClampCeil(preferred.width() * bottom_corner));
 -      corner_bounds =
 -          gfx::Rect(vertical_tab_strip_bounds.right(),
 -                    vertical_tab_strip_bounds.bottom() - preferred.height(),
@@ -258,7 +282,7 @@
    // When the tabstrip isn't at the top or in constrained widths, the top
    // container is laid out before all side panels.
    if (horizontal_layout.force_top_container_to_top &&
-@@ -1012,13 +951,44 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1100,13 +1039,44 @@ BrowserViewTabbedLayoutImpl::CalculatePr
          layout.AddChild(views().top_container, gfx::Rect());
  
      // Calculate the params for laying out the top container.
@@ -306,7 +330,7 @@
  
      if (dynamic_tab_strip &&
          layout_data_->tab_strip_type == TabStripType::kHorizontal) {
-@@ -1036,20 +1006,6 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1124,20 +1094,6 @@ BrowserViewTabbedLayoutImpl::CalculatePr
      }
  
      params.SetTop(top_container_layout.bounds.bottom());
@@ -327,7 +351,7 @@
    }
  
    if (dynamic_tab_strip) {
-@@ -1195,7 +1151,7 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1283,7 +1239,7 @@ BrowserViewTabbedLayoutImpl::CalculatePr
      params.SetTop(top_container_layout.bounds.bottom());
    }
  
@@ -336,17 +360,7 @@
      if (delegate().IsVerticalTabStripRightAligned()) {
        trailing_side_chrome_attached = true;
      } else {
-@@ -1354,7 +1310,8 @@ BrowserViewTabbedLayoutImpl::CalculatePr
-       // view even if there's a shadow box, but since the curve is effectively
-       // the same this will not produce a visual bug.
-       const int radius =
--          views().vertical_tab_strip_bottom_corner->GetCornerRadius();
-+          views().browser_view->GetLayoutProvider()->GetCornerRadiusMetric(
-+              views::ShapeContextTokens::kContentSeparatorRadius);
-       if (base::i18n::IsRTL()) {
-         content_corners.set_lower_right(radius);
-       } else {
-@@ -1366,75 +1323,31 @@ BrowserViewTabbedLayoutImpl::CalculatePr
+@@ -1438,72 +1394,31 @@ BrowserViewTabbedLayoutImpl::CalculatePr
  
    // Make final visual adjustments required for child views to paint.
    if (layout_data_->tab_strip_type == TabStripType::kVertical) {
@@ -396,10 +410,7 @@
 -    float transition_button_opacity = 1.0f;
 -    if (toolbar_height > 0 && caption_button_width > 0) {
 -      if (!will_wrap_at_destination &&
--          (vertical_tab_strip_animation.current_motion ==
--               TabStripAnimations::kExpand ||
--           vertical_tab_strip_animation.current_motion ==
--               TabStripAnimations::kCollapse)) {
+-          vertical_tab_strip_animation.is_expanding_or_collapsing()) {
 -        constexpr float kOpacityTransitionStart = 0.2f;
 -        constexpr float kOpacityTransitionEnd = 0.8f;
 -        if (vertical_tab_strip_animation.tab_strip_width <
@@ -437,9 +448,19 @@
    }
  
    if (IsParentedTo(views().side_panel_content_transition_scrim,
-@@ -1618,9 +1531,17 @@ void BrowserViewTabbedLayoutImpl::DoPreL
- void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
-     const BrowserLayoutParams& params) {
+@@ -1688,7 +1603,8 @@ void BrowserViewTabbedLayoutImpl::DoPost
+       // view even if there's a shadow box, but since the curve is effectively
+       // the same this will not produce a visual bug.
+       const int radius =
+-          views().vertical_tab_strip_bottom_corner->GetCornerRadius();
++          views().browser_view->GetLayoutProvider()->GetCornerRadiusMetric(
++              views::ShapeContextTokens::kContentSeparatorRadius);
+       if (base::i18n::IsRTL()) {
+         content_corners.set_lower_right(radius);
+       } else {
+@@ -1699,9 +1615,17 @@ void BrowserViewTabbedLayoutImpl::DoPost
+   }
+ 
    int side_panel_start = layout_data_->revised_params.visual_client_area.x();
 +  int side_panel_end =
 +      layout_data_->revised_params.visual_client_area.right();
@@ -454,9 +475,9 @@
 +      side_panel_start = vertical_tab_strip_bounds.right();
 +    }
  
-     views().vertical_tab_strip_region_view->UpdatePanelClips();
+     views().vertical_tab_strip_region_view->UpdatePanelClipAndOpacity();
  
-@@ -1668,8 +1589,7 @@ void BrowserViewTabbedLayoutImpl::DoPost
+@@ -1749,8 +1673,7 @@ void BrowserViewTabbedLayoutImpl::DoPost
      const int left_overlap =
          std::max(0, side_panel_start - views().side_panel->x());
      const int right_overlap = std::max(
@@ -484,21 +505,7 @@
  class VerticalTabStripBottomContainer;
  class VerticalTabStripFocusSwipeController;
  class ShadowFrameView;
-@@ -66,11 +66,11 @@ class VerticalTabStripRegionView final
- 
-   // TODO(crbug.com/465833741): Replace constant with derived value based on
-   // caption buttons.
--  static constexpr int kUncollapsedMinWidth = 126;
-+  static constexpr int kUncollapsedMinWidth = 160;
-   // TODO(crbug.com/465832180): Replace constant based width final max width for
-   // view.
-   static constexpr int kUncollapsedMaxWidth = 400;
--  static constexpr int kCollapsedWidth = 56;
-+  static constexpr int kCollapsedWidth = 42;
-   // TODO(crbug.com/465833741): Determine snapping behavior.
-   static constexpr int kCollapseSnapWidth =
-       (kUncollapsedMinWidth + kCollapsedWidth) / 2;
-@@ -84,26 +84,13 @@ class VerticalTabStripRegionView final
+@@ -73,26 +73,13 @@ class VerticalTabStripRegionView final
        delete;
    ~VerticalTabStripRegionView() override;
  
@@ -526,7 +533,7 @@
  
    // views::LayoutDelegate:
    views::ProposedLayout CalculateProposedLayout(
-@@ -216,6 +203,8 @@ class VerticalTabStripRegionView final
+@@ -186,6 +173,8 @@ class VerticalTabStripRegionView final
    void AddTabStripView(std::unique_ptr<views::View> view) override;
    std::unique_ptr<views::View> RemoveTabStripView(views::View* view) override;
  
@@ -535,8 +542,8 @@
    void OnCollapseStateChanged(
        tabs::VerticalTabStripCollapseState collapse_state);
  
-@@ -257,8 +246,12 @@ class VerticalTabStripRegionView final
-   bool organizer_panel_was_visible_ = false;
+@@ -225,8 +214,12 @@ class VerticalTabStripRegionView final
+   double organizer_panel_show_percent_ = 0.0;
  
    raw_ptr<views::View> content_area_view_ = nullptr;
 -  raw_ptr<VerticalTabStripTopContainer> top_button_container_ = nullptr;
@@ -552,7 +559,7 @@
    raw_ptr<views::ResizeArea> resize_area_ = nullptr;
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-@@ -37,6 +37,7 @@
+@@ -38,6 +38,7 @@
  #include "chrome/browser/ui/views/animations/tab_strip_animations.h"
  #include "chrome/browser/ui/views/frame/base_tab_strip_region_view.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -560,9 +567,9 @@
  #include "chrome/browser/ui/views/frame/custom_corners_background.h"
  #include "chrome/browser/ui/views/frame/frame_separator.h"
  #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
-@@ -52,10 +53,8 @@
+@@ -53,10 +54,8 @@
  #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
- #include "chrome/browser/ui/views/tabs/organizer/organizer_panel_utils.h"
+ #include "chrome/browser/ui/views/tabs/organizer/organizer_panel_view.h"
  #include "chrome/browser/ui/views/tabs/shared/drop_arrow.h"
 -#include "chrome/browser/ui/views/tabs/vertical/top_container_button.h"
  #include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h"
@@ -571,7 +578,7 @@
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #include "chrome/grit/generated_resources.h"
  #include "components/tabs/public/tab_group.h"
-@@ -88,6 +87,8 @@ constexpr int kResizeAreaWidth = 5;
+@@ -89,6 +88,8 @@ constexpr int kResizeAreaWidth = 5;
  constexpr int kCollapsedResizeAreaWidth = 2;
  constexpr int kKeyboardResizeWidth = 50;
  constexpr int kSnapDistance = 15;
@@ -580,7 +587,7 @@
  
  // Shadow is used in expand-on-hover mode. Shadow radius and opacity are dynamic
  // and set by the layout.
-@@ -119,10 +120,6 @@ VerticalTabStripRegionView::VerticalTabS
+@@ -138,10 +139,6 @@ VerticalTabStripRegionView::VerticalTabS
    SetLayoutManager(std::make_unique<views::DelegatingLayoutManager>(this));
  
    // Create child views.
@@ -591,7 +598,7 @@
    auto content_area_view = std::make_unique<views::FlexLayoutView>();
    content_area_view->SetOrientation(views::LayoutOrientation::kVertical);
    content_area_view->SetCollapseMargins(true);
-@@ -144,16 +141,6 @@ VerticalTabStripRegionView::VerticalTabS
+@@ -163,16 +160,6 @@ VerticalTabStripRegionView::VerticalTabS
    const int region_horizontal_padding =
        GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
  
@@ -608,7 +615,7 @@
    bottom_button_container_ = content_area_view_->AddChildView(
        std::make_unique<VerticalTabStripBottomContainer>(
            state_controller_, root_action_item, browser_view->browser(),
-@@ -166,10 +153,8 @@ VerticalTabStripRegionView::VerticalTabS
+@@ -185,10 +172,8 @@ VerticalTabStripRegionView::VerticalTabS
                                 views::MaximumFlexSizeRule::kUnbounded));
    bottom_button_container_->SetProperty(
        views::kMarginsKey,
@@ -621,7 +628,7 @@
  
    gemini_button_ =
        content_area_view_->AddChildView(std::make_unique<views::View>());
-@@ -212,6 +197,7 @@ VerticalTabStripRegionView::VerticalTabS
+@@ -231,6 +216,7 @@ VerticalTabStripRegionView::VerticalTabS
    }
  
    SetNotifyEnterExitOnChild(true);
@@ -629,7 +636,7 @@
  }
  
  VerticalTabStripRegionView::~VerticalTabStripRegionView() {
-@@ -297,13 +283,6 @@ bool VerticalTabStripRegionView::IsPosit
+@@ -316,13 +302,6 @@ bool VerticalTabStripRegionView::IsPosit
      return false;
    }
  
@@ -640,10 +647,10 @@
 -    return top_button_container_->IsPositionInWindowCaption(point_in_child);
 -  }
 -
-   if (IsHitInView(bottom_button_container_, point)) {
+   if (content_area_view_->GetVisible() &&
+       IsHitInView(bottom_button_container_, point)) {
      gfx::Point point_in_child = point;
-     views::View::ConvertPointToTarget(this, bottom_button_container_,
-@@ -328,43 +307,13 @@ bool VerticalTabStripRegionView::IsPosit
+@@ -364,40 +343,13 @@ bool VerticalTabStripRegionView::IsPosit
    return true;
  }
  
@@ -663,20 +670,17 @@
 -}
 -
 -void VerticalTabStripRegionView::SetTransitionButtonOpacity(float opacity) {
--  for (views::LabelButton* label_button :
--       {top_button_container_->GetCollapseButton(),
--        top_button_container_->GetUnfocusButton()}) {
--    if (label_button) {
--      auto* button = static_cast<TopContainerButton*>(label_button);
--      button->layer()->SetOpacity(opacity);
+-  if (views::LabelButton* label_button =
+-          top_button_container_->GetCollapseButton()) {
+-    auto* button = static_cast<TopContainerButton*>(label_button);
+-    button->layer()->SetOpacity(opacity);
 -
--      if (opacity == 0.0f) {
--        button->ApplyPendingIcon();
--      }
--      if (opacity == 1.0f) {
--        button->SetDelayIconUpdates(false);
--        button->ApplyPendingIcon();
--      }
+-    if (opacity == 0.0f) {
+-      button->ApplyPendingIcon();
+-    }
+-    if (opacity == 1.0f) {
+-      button->SetDelayIconUpdates(false);
+-      button->ApplyPendingIcon();
 -    }
 +void VerticalTabStripRegionView::SetHasLeadingExclusionForLayout(
 +    bool has_leading_exclusion) {
@@ -693,7 +697,7 @@
  }
  
  void VerticalTabStripRegionView::AddedToWidget() {
-@@ -389,19 +338,6 @@ views::ProposedLayout VerticalTabStripRe
+@@ -422,28 +374,12 @@ views::ProposedLayout VerticalTabStripRe
      const views::SizeBounds& size_bounds) const {
    views::ProposedLayout layout;
  
@@ -703,8 +707,18 @@
 -  const auto vertical_padding = GetLayoutConstant(
 -      LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding);
 -
+   const bool blending_with_organizer_tray =
+       !organizer_panel_view_ && organizer_panel_show_percent_ > 0.0;
+   const int blend_target_width = state_controller_->IsCollapsed()
+-                                     ? tabs::kVerticalTabStripCollapsedWidth
++                                     ? GetVerticalTabStripCollapsedWidth()
+                                      : state_controller_->GetUncollapsedWidth();
+ 
 -  views::SizeBounds button_available_size = size_bounds;
--  if (button_available_size.width().is_bounded()) {
+-  if (blending_with_organizer_tray) {
+-    button_available_size.set_width(blend_target_width -
+-                                    2 * horizontal_padding);
+-  } else if (button_available_size.width().is_bounded()) {
 -    button_available_size.set_width(button_available_size.width() -
 -                                    2 * horizontal_padding);
 -  }
@@ -713,7 +727,7 @@
    const gfx::Size tab_strip_size =
        tab_strip_view() ? tab_strip_view()->GetPreferredSize() : gfx::Size();
    const gfx::Size organizer_panel_size =
-@@ -412,26 +348,13 @@ views::ProposedLayout VerticalTabStripRe
+@@ -454,28 +390,13 @@ views::ProposedLayout VerticalTabStripRe
    // specified.
    layout.host_size = gfx::Size(
        size_bounds.width().value_or(
@@ -734,16 +748,18 @@
 -  layout.child_layouts.push_back(
 -      {.child_view = top_button_container_.get(),
 -       .visible = true,
--       .bounds =
--           gfx::Rect(horizontal_padding, 0,
--                     std::max(0, available.width() - 2 * horizontal_padding),
--                     button_size.height())});
+-       .bounds = gfx::Rect(
+-           horizontal_padding, 0,
+-           blending_with_organizer_tray
+-               ? button_size.width()
+-               : std::max(0, available.width() - 2 * horizontal_padding),
+-           button_size.height())});
 -  available.Inset(gfx::Insets::TLBR(button_size.height(), 0, 0, 0));
 +  available.Inset(interior_margin_);
  
    // Just so that there's never a zero-size tabstrip.
    available.set_height(std::max(1, available.height()));
-@@ -470,9 +393,11 @@ void VerticalTabStripRegionView::Layout(
+@@ -507,9 +428,11 @@ void VerticalTabStripRegionView::Layout(
  
    // Manually position the resize area as it overlaps views handled by the flex
    // layout.
@@ -755,10 +771,10 @@
 +                                : bounds().right() - resize_area_width_;
 +  resize_area_->SetBoundsRect(
 +      gfx::Rect(resize_area_x, 0, resize_area_width_, bounds().height()));
+   resize_area_->SetVisible(organizer_panel_show_percent_ == 0.0);
    shadow_frame_->SetBoundsRect(GetLocalBounds());
  
-   // Ensure that we update the drop arrow position so that it does not render in
-@@ -488,7 +413,7 @@ views::View* VerticalTabStripRegionView:
+@@ -526,13 +449,13 @@ views::View* VerticalTabStripRegionView:
      return GetTabAnchorView(active_tab->GetHandle());
    }
  
@@ -767,7 +783,28 @@
  }
  
  gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
-@@ -707,7 +632,10 @@ void VerticalTabStripRegionView::OnResiz
+   auto min_size = BaseTabStripRegionView::GetMinimumSize();
+   min_size.set_width((state_controller_->IsCollapsed() || IsAnimatingSize())
+-                         ? tabs::kVerticalTabStripCollapsedWidth
++                         ? GetVerticalTabStripCollapsedWidth()
+                          : tabs::kVerticalTabStripUncollapsedMinWidth);
+   return min_size;
+ }
+@@ -546,11 +469,11 @@ gfx::Size VerticalTabStripRegionView::Ca
+       controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
+   const int expand_amount =
+       std::max(0, target_collapse_state_.uncollapsed_width -
+-                      tabs::kVerticalTabStripCollapsedWidth);
++                      GetVerticalTabStripCollapsedWidth());
+   const double expand_percent =
+       *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+                                    TabStripAnimations::kTabStripWidth);
+-  size.set_width(tabs::kVerticalTabStripCollapsedWidth +
++  size.set_width(GetVerticalTabStripCollapsedWidth() +
+                  (motion == TabStripAnimations::kExpand
+                       ? std::floor<double>
+                       : std::ceil<double>)(expand_amount * expand_percent));
+@@ -747,7 +670,10 @@ void VerticalTabStripRegionView::OnResiz
      state_controller_->SetIsResizing(true);
    }
    bool previously_collapsed = target_collapse_state_.collapsed;
@@ -779,14 +816,22 @@
    if (done_resizing) {
      starting_width_on_resize_ = std::nullopt;
      state_controller_->SetIsResizing(false);
-@@ -725,6 +653,19 @@ void VerticalTabStripRegionView::OnResiz
-       new_state.uncollapsed_width =
-           tabs::kVerticalTabStripDefaultUncollapsedWidth;
-     }
+@@ -761,12 +687,23 @@ void VerticalTabStripRegionView::OnResiz
+     new_state.uncollapsed_width =
+         std::clamp(proposed_width, tabs::kVerticalTabStripUncollapsedMinWidth,
+                    tabs::kVerticalTabStripUncollapsedMaxWidth);
+-    if (std::abs(new_state.uncollapsed_width -
+-                 tabs::kVerticalTabStripDefaultUncollapsedWidth) <
++    const int default_uncollapsed_width =
++        GetVerticalTabStripDefaultUncollapsedWidth();
++    if (std::abs(new_state.uncollapsed_width - default_uncollapsed_width) <
+         kSnapDistance) {
+-      new_state.uncollapsed_width =
+-          tabs::kVerticalTabStripDefaultUncollapsedWidth;
++      new_state.uncollapsed_width = default_uncollapsed_width;
++    }
 +
 +    // Snap to default uncollapsed width if within the snap distance.
-+    const int default_uncollapsed_width =
-+        tabs::kVerticalTabStripDefaultUncollapsedWidth;
 +    const int min_snap_width =
 +        default_uncollapsed_width - kDefaultWidthSnapDistance;
 +    const int max_snap_width =
@@ -794,12 +839,21 @@
 +    if (new_state.uncollapsed_width >= min_snap_width &&
 +        new_state.uncollapsed_width <= max_snap_width) {
 +      new_state.uncollapsed_width = default_uncollapsed_width;
-+    }
+     }
 +
      if (done_resizing) {
        // We only want to save the uncollapsed width to the state controller if
        // the user has lifted their mouse, otherwise dragging the resize area to
-@@ -843,19 +784,16 @@ void VerticalTabStripRegionView::AddTabS
+@@ -789,7 +726,7 @@ void VerticalTabStripRegionView::OnResiz
+                             : "VerticalTabs_TabStrip_ResizeToUncollapsed"));
+     base::UmaHistogramCounts1000("Tabs.VerticalTabs.TabStripSize",
+                                  new_state.collapsed
+-                                     ? tabs::kVerticalTabStripCollapsedWidth
++                                     ? GetVerticalTabStripCollapsedWidth()
+                                      : new_state.uncollapsed_width);
+   }
+ 
+@@ -873,19 +810,16 @@ void VerticalTabStripRegionView::AddTabS
        views::kFlexBehaviorKey,
        views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
                                 views::MaximumFlexSizeRule::kPreferred));
@@ -826,7 +880,7 @@
  
    // Pre-set the animation values to the appropriate state.
    auto* const animation_controller =
-@@ -889,6 +827,13 @@ std::unique_ptr<views::View> VerticalTab
+@@ -919,6 +853,13 @@ std::unique_ptr<views::View> VerticalTab
    return BaseTabStripRegionView::RemoveTabStripView(view);
  }
  
@@ -840,7 +894,7 @@
  void VerticalTabStripRegionView::OnCollapseStateChanged(
      tabs::VerticalTabStripCollapseState state) {
    // Apply padding immediately at the start of the animation by including
-@@ -905,26 +850,6 @@ void VerticalTabStripRegionView::OnColla
+@@ -935,23 +876,6 @@ void VerticalTabStripRegionView::OnColla
      tab_strip_view()->SetCollapsedState(collapsed);
    }
  
@@ -853,13 +907,10 @@
 -                LayoutConstant::kVerticalTabStripHorizontalPadding));
 -
 -    if (!will_wrap) {
--      for (views::LabelButton* label_button :
--           {top_button_container_->GetCollapseButton(),
--            top_button_container_->GetUnfocusButton()}) {
--        if (label_button) {
--          static_cast<TopContainerButton*>(label_button)
--              ->SetDelayIconUpdates(true);
--        }
+-      if (views::LabelButton* label_button =
+-              top_button_container_->GetCollapseButton()) {
+-        static_cast<TopContainerButton*>(label_button)
+-            ->SetDelayIconUpdates(true);
 -      }
 -    }
 -  }
@@ -867,7 +918,7 @@
    if (state == tabs::VerticalTabStripCollapseState::kExpanded ||
        state == tabs::VerticalTabStripCollapseState::kCollapsed) {
      UpdateExpandOnHoverState();
-@@ -932,10 +857,9 @@ void VerticalTabStripRegionView::OnColla
+@@ -959,10 +883,9 @@ void VerticalTabStripRegionView::OnColla
  }
  
  bool VerticalTabStripRegionView::IsCollapseButtonHovered() const {
@@ -883,15 +934,36 @@
  gfx::Rect VerticalTabStripRegionView::GetTabStripDraggableBounds() const {
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state.h
 +++ b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
-@@ -7,7 +7,7 @@
+@@ -5,16 +5,17 @@
+ #ifndef CHROME_BROWSER_UI_TABS_VERTICAL_TAB_STRIP_STATE_H_
+ #define CHROME_BROWSER_UI_TABS_VERTICAL_TAB_STRIP_STATE_H_
  
++#include "chrome/browser/ui/layout_constants.h"
++
  namespace tabs {
  
 -inline constexpr int kVerticalTabStripDefaultUncollapsedWidth = 240;
-+inline constexpr int kVerticalTabStripDefaultUncollapsedWidth = 200;
+ // TODO(crbug.com/465833741): Replace constant with derived value based on
+ // caption buttons.
+-inline constexpr int kVerticalTabStripUncollapsedMinWidth = 126;
++inline constexpr int kVerticalTabStripUncollapsedMinWidth = 160;
+ // TODO(crbug.com/465832180): Replace constant based width final max width for
+ // view.
+ inline constexpr int kVerticalTabStripUncollapsedMaxWidth = 400;
+-inline constexpr int kVerticalTabStripCollapsedWidth = 56;
++inline constexpr int kVerticalTabStripCollapsedWidth = 42;
+ // TODO(crbug.com/465833741): Determine snapping behavior.
+ inline constexpr int kVerticalTabStripCollapseSnapWidth =
+     (kVerticalTabStripUncollapsedMinWidth + kVerticalTabStripCollapsedWidth) /
+@@ -25,7 +26,7 @@ struct VerticalTabStripState {
+   // Whether the vertical tab strip is collapsed.
+   bool collapsed = false;
+   // The width of the vertical tab strip when it is not collapsed.
+-  int uncollapsed_width = kVerticalTabStripDefaultUncollapsedWidth;
++  int uncollapsed_width = GetVerticalTabStripDefaultUncollapsedWidth();
  
- // Per-window state for the vertical tab strip.
- struct VerticalTabStripState {
+   bool operator==(const VerticalTabStripState&) const = default;
+ };
 --- a/chrome/browser/ui/views/tabs/vertical/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
 @@ -8,6 +8,7 @@ import("//chrome/common/features.gni")
@@ -902,7 +974,7 @@
      "vertical_tab_strip_bottom_container.h",
      "vertical_tab_strip_expand_on_hover_lock.h",
      "vertical_tab_strip_focus_swipe_controller.h",
-@@ -37,6 +38,7 @@ source_set("vertical") {
+@@ -38,6 +39,7 @@ source_set("vertical") {
  source_set("impl") {
    sources = [
      "top_container_button.cc",
@@ -912,7 +984,7 @@
      "vertical_tab_strip_focus_swipe_controller.cc",
 --- /dev/null
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.cc
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,44 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -941,8 +1013,11 @@
 +  SetCornerRadius(GetLayoutConstant(LayoutConstant::kVerticalTabCornerRadius));
 +  SetForegroundColorId(kColorToolbarButtonIconDisabled);
 +  SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
-+  SetLabelInsets(gfx::Insets::VH(kBasePadding, kBigPadding),
-+                 gfx::Insets::VH(kBasePadding, kBigPadding));
++  // Align the icon with the tab favicons.
++  const int horizontal_padding =
++      GetLayoutConstant(LayoutConstant::kTabHorizontalPadding);
++  SetLabelInsets(gfx::Insets::VH(kBasePadding, horizontal_padding),
++                 gfx::Insets::VH(kBasePadding, horizontal_padding));
 +  SetImageLabelSpacing(kBigPadding);
 +  SetShouldShowLabel(true);
 +  SetLabelText(l10n_util::GetStringUTF16(IDS_ACCNAME_NEWTAB));
@@ -981,14 +1056,13 @@
 +#endif  // CHROME_BROWSER_UI_VIEWS_TABS_VERTICAL_VERTICAL_NEW_TAB_BUTTON_H_
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
-@@ -6,29 +6,23 @@
+@@ -6,28 +6,22 @@
  
  #include "base/functional/bind.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
 -#include "chrome/browser/ui/layout_constants.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
- #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 -#include "chrome/browser/ui/views/tabs/shared/new_tab_button.h"
 -#include "chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h"
 -#include "ui/actions/actions.h"
@@ -1015,7 +1089,7 @@
    new_tab_button->SetOnContextMenuWillShowCallback(base::BindRepeating(
        &VerticalTabStripBottomContainer::OnNewTabButtonContextMenuWillShow,
        base::Unretained(this)));
-@@ -98,14 +92,12 @@ void VerticalTabStripBottomContainer::Up
+@@ -97,14 +91,12 @@ void VerticalTabStripBottomContainer::Up
    new_tab_button_->SetProperty(
        views::kFlexBehaviorKey,
        views::FlexSpecification(
@@ -1066,7 +1140,7 @@
    // Returns whether the webapp frame toolbar should be drawn.
    bool ShouldDrawWebAppFrameToolbar() const;
  
-@@ -1253,10 +1256,6 @@ class BrowserView : public BrowserWindow
+@@ -1251,10 +1254,6 @@ class BrowserView : public BrowserWindow
    raw_ptr<VerticalTabStripBackgroundBlurBackdrop>
        vertical_tab_strip_background_blur_backdrop_ = nullptr;
  
@@ -1090,7 +1164,7 @@
    raw_ptr<InfoBarContainerView> infobar_container = nullptr;
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
-@@ -171,7 +171,6 @@
+@@ -173,7 +173,6 @@
  #include "chrome/browser/ui/views/frame/contents_container_view.h"
  #include "chrome/browser/ui/views/frame/contents_separator.h"
  #include "chrome/browser/ui/views/frame/contents_web_view.h"
@@ -1098,7 +1172,7 @@
  #include "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout_delegate_impl.h"
-@@ -1090,25 +1089,6 @@ BrowserView::BrowserView(BrowserWindowIn
+@@ -1097,25 +1096,6 @@ BrowserView::BrowserView(BrowserWindowIn
      }
      vertical_tab_strip_region_view_ =
          AddChildView(std::move(vertical_tab_strip_container));
@@ -1124,7 +1198,7 @@
    } else {
      horizontal_tab_strip_region_view_->InitializeTabStrip();
    }
-@@ -1260,8 +1240,6 @@ BrowserView::~BrowserView() {
+@@ -1272,8 +1252,6 @@ BrowserView::~BrowserView() {
    side_panel_content_transition_scrim_view_ = nullptr;
    vertical_tab_strip_region_view_ = nullptr;
    vertical_tab_strip_background_blur_backdrop_ = nullptr;
@@ -1133,7 +1207,7 @@
    organizer_tray_ = nullptr;
    side_panel_ = nullptr;
  
-@@ -1572,6 +1550,11 @@ bool BrowserView::ShouldDrawVerticalTabS
+@@ -1584,6 +1562,11 @@ bool BrowserView::ShouldDrawVerticalTabS
           browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL;
  }
  
@@ -1145,7 +1219,7 @@
  bool BrowserView::ShouldDrawWebAppFrameToolbar() const {
    return !IsUnframedModeEnabled() &&
           GetFrameView()->ShouldShowWebAppFrameToolbar();
-@@ -1714,7 +1697,21 @@ void BrowserView::OnVerticalTabStripMode
+@@ -1730,7 +1713,21 @@ void BrowserView::OnVerticalTabStripMode
          std::move(selection_state));
    }
  
@@ -1168,7 +1242,7 @@
      horizontal_tab_strip_region_view_->ResetTabStrip();
      vertical_tab_strip_region_view_->InitializeTabStrip();
    } else {
-@@ -5313,9 +5310,6 @@ void BrowserView::AddedToWidget() {
+@@ -5355,9 +5352,6 @@ void BrowserView::AddedToWidget() {
    layout_views.vertical_tab_strip_region_view = vertical_tab_strip_region_view_;
    layout_views.vertical_tab_strip_background_blur_backdrop =
        vertical_tab_strip_background_blur_backdrop_;
@@ -1200,8 +1274,8 @@
    SetPaintToLayer();
 --- a/chrome/browser/ui/tabs/tab_menu_model.cc
 +++ b/chrome/browser/ui/tabs/tab_menu_model.cc
-@@ -605,34 +605,6 @@ void TabMenuModel::Build(int index) {
-     }
+@@ -676,34 +676,6 @@ void TabMenuModel::Build(int index) {
+     BuildSendTabToSelfItem(index, indices);
    }
  
 -  if (controller) {
@@ -1290,33 +1364,25 @@
  }
 --- a/chrome/browser/ui/views/animations/tab_strip_animations.cc
 +++ b/chrome/browser/ui/views/animations/tab_strip_animations.cc
-@@ -5,7 +5,6 @@
- #include "chrome/browser/ui/views/animations/tab_strip_animations.h"
- 
- #include "chrome/browser/ui/animation/browser_animation_types.h"
--#include "chrome/browser/ui/ui_features.h"
- #include "chrome/browser/ui/views/animations/common_animation_values.h"
- #include "ui/base/interaction/safe_castable.h"
- 
-@@ -55,14 +54,9 @@ TabStripAnimations::TabStripAnimations()
+@@ -54,14 +54,9 @@ TabStripAnimations::TabStripAnimations()
  TabStripAnimations::~TabStripAnimations() = default;
  
  TabStripAnimations::GroupInfos TabStripAnimations::GenerateAnimations() const {
--  const int expand_duration_ms =
--      features::UseSidePanelFlyoverAnimation() ? 300 : 400;
--  const int collapse_duration_ms =
--      features::UseSidePanelFlyoverAnimation() ? 250 : 350;
+-  const bool use_flyover =
+-      browser_animations::GetPanelAnimationType() ==
+-      browser_animations::PanelAnimationType::kClipAndSingleReflow;
+-  const int expand_duration_ms = use_flyover ? 300 : 400;
+-  const int collapse_duration_ms = use_flyover ? 250 : 350;
 -  const gfx::Tween::Type expand_collapse_tween =
--      features::UseSidePanelFlyoverAnimation()
--          ? gfx::Tween::ACCEL_80_DECEL_20
--          : gfx::Tween::EASE_IN_OUT_EMPHASIZED;
+-      use_flyover ? gfx::Tween::ACCEL_80_DECEL_20
+-                  : gfx::Tween::EASE_IN_OUT_EMPHASIZED;
 +  constexpr int kExpandCollapseDurationMs = 250;
 +  constexpr gfx::Tween::Type kExpandCollapseTween =
 +      gfx::Tween::EASE_IN_OUT_EMPHASIZED;
    // The sequence goes: one corner disappears, the top animates, and then the
    // other corner appears. These are the percentages of the animation at which
    // these changes happen.
-@@ -71,8 +65,8 @@ TabStripAnimations::GroupInfos TabStripA
+@@ -70,8 +65,8 @@ TabStripAnimations::GroupInfos TabStripA
  
    return Groups(Group(
        kVerticalTabStrip,
@@ -1327,7 +1393,7 @@
               Animate(kTabStripWidth, FromValue(0.0), ToValue(1.0)),
               Sequence(kTopCorner, Transition::kCapAtOldValue,
                        Keyframe(AtPercent(0), Value(DefaultValue())),
-@@ -86,12 +80,12 @@ TabStripAnimations::GroupInfos TabStripA
+@@ -85,12 +80,12 @@ TabStripAnimations::GroupInfos TabStripA
                        Keyframe(AtPercent(kSecondCheckpoint), Value(0.0))),
               Sequence(kTabStripHoverOpacity, StartingValue(1.0),
                        Transition::kStartAtOldValue,
@@ -1346,7 +1412,7 @@
                        Keyframe(AtPercent(0), Value(1.0)),
 --- a/chrome/browser/ui/views/frame/system_menu_model_builder.cc
 +++ b/chrome/browser/ui/views/frame/system_menu_model_builder.cc
-@@ -196,10 +196,6 @@ void SystemMenuModelBuilder::BuildSystem
+@@ -209,10 +209,6 @@ void SystemMenuModelBuilder::BuildSystem
                                 IDS_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL);
    }
  
@@ -1387,7 +1453,7 @@
  void TabStripFlatEdgeButton::SetIconOpacity(float opacity) {
    if (!image_container_view()->layer()) {
      image_container_view()->SetPaintToLayer();
-@@ -278,6 +299,9 @@ void TabStripFlatEdgeButton::RemovedFrom
+@@ -281,6 +302,9 @@ void TabStripFlatEdgeButton::RemovedFrom
  }
  
  ui::ColorId TabStripFlatEdgeButton::GetForegroundColor() const {
@@ -1397,7 +1463,7 @@
    return GetWidget() && GetWidget()->ShouldPaintAsActive()
               ? kColorNewTabButtonCRForegroundFrameActive
               : kColorNewTabButtonCRForegroundFrameInactive;
-@@ -324,8 +348,11 @@ void TabStripFlatEdgeButton::UpdateLabel
+@@ -327,8 +351,11 @@ void TabStripFlatEdgeButton::UpdateLabel
    }
    if (should_show == GetText().empty()) {
      SetHorizontalAlignment(should_show ? gfx::ALIGN_LEFT : gfx::ALIGN_CENTER);
@@ -1449,20 +1515,30 @@
    views::LayoutOrientation expansion_orientation_ =
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-@@ -724,7 +724,9 @@ int TabGroupHeaderView::GetCornerRadius(
+@@ -11,6 +11,7 @@
+ #include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
++#include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_group_data.h"
+ #include "chrome/browser/ui/tabs/tab_group_theme.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+@@ -791,7 +792,11 @@ gfx::RoundedCornersF TabGroupHeaderView:
  }
  
  int TabGroupHeaderView::GetHorizontalInset() const {
 -  return TabGroupStyle::GetInsetsForHeaderChip(orientation_).left();
++  // Vertical headers match the tab padding, which centers the collapse icon
++  // when the vertical tab strip is collapsed.
 +  return orientation_ == TabStripOrientation::kVertical
-+             ? 7
++             ? GetLayoutConstant(LayoutConstant::kTabHorizontalPadding)
 +             : TabGroupStyle::GetInsetsForHeaderChip(orientation_).left();
  }
  
- BEGIN_METADATA(TabGroupHeaderView)
+ gfx::Insets TabGroupHeaderView::GetHeaderInsets() const {
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view.h
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view.h
-@@ -35,7 +35,7 @@ class TabGroupView : public TabCollectio
+@@ -37,7 +37,7 @@ class TabGroupView : public TabCollectio
    METADATA_HEADER(TabGroupView, TabCollectionZOrderManager)
  
   public:
@@ -1471,9 +1547,9 @@
  
    explicit TabGroupView(TabCollectionNode* collection_node);
    TabGroupView(const TabGroupView&) = delete;
---- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-+++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-@@ -25,9 +25,9 @@
+--- a/chrome/browser/ui/views/tabs/common/tab_group_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_group_view_vertical_layout.cc
+@@ -20,10 +20,14 @@
  namespace {
  constexpr int kTabVerticalPadding = 2;
  constexpr int kGroupLineWidth = 2;
@@ -1482,10 +1558,33 @@
  constexpr int kGroupHeaderHeight = 26;
 -constexpr int kGroupHeaderVerticalMargin = 4;
 +constexpr int kGroupHeaderVerticalMargin = 3;
+ constexpr int kFocusedHeadersGap = 2;
++
++int GetGroupHeaderHeight() {
++  return IsSpaciousUiDensity() ? kGroupHeaderHeight + 4 : kGroupHeaderHeight;
++}
  }  // namespace
  
- TabGroupViewLayout::TabGroupViewLayout(TabStripOrientation orientation)
-@@ -102,8 +102,7 @@ views::ProposedLayout TabGroupViewLayout
+ TabGroupViewVerticalLayout::TabGroupViewVerticalLayout() = default;
+@@ -60,7 +64,7 @@ views::ProposedLayout TabGroupViewVertic
+       gfx::Rect unfocus_bounds;
+       unfocus_bounds.set_x(header_bounds.x());
+       unfocus_bounds.set_y(height);
+-      unfocus_bounds.set_height(kGroupHeaderHeight);
++      unfocus_bounds.set_height(GetGroupHeaderHeight());
+       if (size_bounds.width().is_bounded()) {
+         unfocus_bounds.set_width(size_bounds.width().value() -
+                                  unfocus_bounds.x());
+@@ -76,7 +80,7 @@ views::ProposedLayout TabGroupViewVertic
+   }
+ 
+   header_bounds.set_y(height);
+-  header_bounds.set_height(kGroupHeaderHeight);
++  header_bounds.set_height(GetGroupHeaderHeight());
+   // If width is bounded, the group header should respect the width constraints
+   // and take up the available width excluding trailing horizontal padding.
+   if (size_bounds.width().is_bounded()) {
+@@ -95,8 +99,7 @@ views::ProposedLayout TabGroupViewVertic
    // aligned with the header.
    if (tab_strip_collapse_state ==
        tabs::VerticalTabStripCollapseState::kExpanded) {
@@ -1497,7 +1596,7 @@
  
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
-@@ -191,11 +191,6 @@ TabStripView::TabStripView(TabCollection
+@@ -181,11 +181,6 @@ TabStripView::TabStripView(TabCollection
        views::ScrollView::ScrollWithLayers::kEnabled));
    SetScrollViewProperties(pinned_tabs_scroll_view_);
  
@@ -1519,7 +1618,7 @@
    TabScrollButtonContainer* scroll_button_container =
        tab_strip_view->GetScrollButtonContainer();
    const int scroll_button_container_preferred_width =
-@@ -143,9 +142,6 @@ views::ProposedLayout TabStripViewLayout
+@@ -168,9 +167,6 @@ views::ProposedLayout TabStripViewLayout
                        : pinned_width;
    }
  
@@ -1529,7 +1628,7 @@
    // Place the unpinned container.
    int unpinned_width = unpinned_preferred_width;
    bool show_scroll_buttons = false;
-@@ -226,8 +222,6 @@ views::ProposedLayout TabStripViewLayout
+@@ -271,8 +267,6 @@ views::ProposedLayout TabStripViewLayout
        tab_strip_view->pinned_tabs_scroll_view();
    views::ScrollView* unpinned_tabs_scroll_view =
        tab_strip_view->unpinned_tabs_scroll_view();
@@ -1538,7 +1637,7 @@
  
    if (!size_bounds.width().is_bounded()) {
      return layouts;
-@@ -251,10 +245,6 @@ views::ProposedLayout TabStripViewLayout
+@@ -296,10 +290,6 @@ views::ProposedLayout TabStripViewLayout
    const int unpinned_preferred_height =
        unpinned_tabs_scroll_view->GetPreferredSize(size_bounds).height();
  
@@ -1549,7 +1648,7 @@
    // If the height is bounded, calculate the available space for laying out the
    // pinned and unpinned containers.
    int remaining_height = 0;
-@@ -263,10 +253,6 @@ views::ProposedLayout TabStripViewLayout
+@@ -308,10 +298,6 @@ views::ProposedLayout TabStripViewLayout
      if (pinned_preferred_height != 0 && unpinned_preferred_height != 0) {
        remaining_height -= region_vertical_padding;
      }
@@ -1560,7 +1659,7 @@
      // Clamp the remaining height to 0 if we have less space.
      remaining_height = std::max(remaining_height, 0);
    }
-@@ -300,19 +286,6 @@ views::ProposedLayout TabStripViewLayout
+@@ -345,19 +331,6 @@ views::ProposedLayout TabStripViewLayout
      }
    }
  
@@ -1582,7 +1681,7 @@
    // strip is collapsed, tab groups need to draw the group colored line in this
 --- a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
-@@ -19,7 +19,7 @@
+@@ -20,7 +20,7 @@
  namespace {
  constexpr int kIconDesignWidth = 16;
  constexpr int kTitleMinWidth = 10;
@@ -1591,7 +1690,7 @@
  constexpr int kDefaultPadding = 4;
  }  // namespace
  
-@@ -32,14 +32,14 @@ void TabViewVerticalLayout::OnInstalled(
+@@ -33,14 +33,14 @@ void TabViewVerticalLayout::OnInstalled(
        TabChildConfig(TabView().close_button_, kIconDesignWidth, kDefaultPadding,
                       /*align_leading=*/false,
                       /*expand=*/false),
@@ -1610,7 +1709,7 @@
        TabChildConfig(TabView().title_, kTitleMinWidth, kDefaultPadding,
                       /*align_leading=*/true,
                       /*expand=*/true)};
-@@ -162,7 +162,9 @@ bool TabViewVerticalLayout::IsChildVisib
+@@ -164,7 +164,9 @@ bool TabViewVerticalLayout::IsChildVisib
    }
  
    if (child_view == TabView().icon_) {
@@ -1623,7 +1722,7 @@
  
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
-@@ -899,6 +899,9 @@ gfx::Size TabView::GetMinimumSize() cons
+@@ -926,6 +926,9 @@ gfx::Size TabView::GetMinimumSize() cons
  void TabView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
    if (orientation_ == TabStripOrientation::kVertical) {
      SetClipPath(GetPath());
@@ -1633,7 +1732,7 @@
    }
  }
  
-@@ -938,6 +941,12 @@ bool TabView::GetHitTestMask(SkPath* mas
+@@ -979,6 +982,12 @@ bool TabView::GetHitTestMask(SkPath* mas
  }
  
  bool TabView::ShouldEnableMuteToggle(int required_width) {
@@ -1646,30 +1745,23 @@
    if (active_) {
      return true;
    }
-@@ -946,7 +955,13 @@ bool TabView::ShouldEnableMuteToggle(int
-     return false;
+@@ -1127,6 +1136,7 @@ void TabView::OnCollapseStateChanged(
+       state == tabs::VerticalTabStripCollapseState::kCollapsed;
+   if (collapsed_ != collapsed) {
+     collapsed_ = collapsed;
++    alert_indicator_->UpdateEnabledForMuteToggle();
+     InvalidateLayout();
    }
- 
--  return alert_indicator_->x() >= required_width;
-+  // The alert indicator is on the leading edge, after the favicon. Measure
-+  // the selectable title area between it and the trailing close button (or
-+  // the tab edge when the close button is hidden).
-+  const int selectable_region_end =
-+      close_button_->GetVisible() ? close_button_->x() : width();
-+  return selectable_region_end - alert_indicator_->bounds().right() >=
-+         required_width;
  }
+@@ -1400,7 +1410,7 @@ int TabView::UncollapsedMinWidth() {
  
- void TabView::ToggleTabAudioMute() {
-@@ -1077,6 +1092,8 @@ void TabView::OnAXNameChanged(ax::mojom:
- void TabView::OnCollapseStateChanged(
-     tabs::VerticalTabStripCollapseState state) {
-   collapsed_ = state == tabs::VerticalTabStripCollapseState::kCollapsed;
-+  alert_indicator_->UpdateEnabledForMuteToggle();
-+  InvalidateLayout();
+ // static
+ int TabView::CollapsedWidth() {
+-  return tabs::kVerticalTabStripCollapsedWidth -
++  return GetVerticalTabStripCollapsedWidth() -
+          2 * GetLayoutConstant(
+                  LayoutConstant::kVerticalTabStripHorizontalPadding);
  }
- 
- void TabView::OnTabStateChanged() {
 --- a/chrome/browser/ui/views/tabs/common/tab_group_line_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_line_view.cc
 @@ -33,7 +33,7 @@
@@ -1681,7 +1773,7 @@
  }  // namespace
  
  TabGroupLineView::TabGroupLineView(TabGroupView& tab_group_view)
-@@ -71,8 +71,10 @@ void TabGroupLineView::PaintVertical(gfx
+@@ -72,8 +72,10 @@ void TabGroupLineView::PaintVertical(gfx
  
    SkRRect rrect;
    SkVector radii[4] = {
@@ -1694,3 +1786,155 @@
    gfx::Rect local_bounds = GetLocalBounds();
    rrect.setRectRadii(
        SkRect::MakeXYWH(local_bounds.x(), local_bounds.y(), local_bounds.width(),
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -568,6 +568,7 @@ source_set("vertical_tab_strip_region_vi
+     "//chrome/browser/ui/views/tabs/common:impl",
+     "//chrome/browser/ui/views/tabs/organizer",
+     "//chrome/browser/ui/web_applications",
++    "//chrome/browser/ui:view_ids",
+     "//ui/base/dragdrop:types",
+     "//ui/compositor",
+     "//ui/display",
+@@ -1549,6 +1550,7 @@ source_set("vertical_tab_strip_backgroun
+   deps = [
+     ":custom_corners_background",
+     "//cc/paint",
++    "//chrome/browser/ui:layout_constants",
+     "//chrome/browser/ui/color:color_headers",
+     "//chrome/browser/ui/tabs",
+     "//ui/color:color_headers",
+--- a/chrome/browser/ui/layout_constants.h
++++ b/chrome/browser/ui/layout_constants.h
+@@ -394,4 +394,10 @@ int GetLayoutConstant(LayoutConstant con
+ 
+ gfx::Insets GetLayoutInsets(LayoutInset inset);
+ 
++// Returns the width of the collapsed vertical tab strip.
++int GetVerticalTabStripCollapsedWidth();
++
++// Returns the default width of the uncollapsed vertical tab strip.
++int GetVerticalTabStripDefaultUncollapsedWidth();
++
+ #endif  // CHROME_BROWSER_UI_LAYOUT_CONSTANTS_H_
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -408,6 +408,7 @@ if (!is_android) {
+       "//chrome/browser/ui:browser_tab_strip",
+       "//chrome/browser/ui:browser_tab_strip_tracker",
+       "//chrome/browser/ui:browser_window_header",
++      "//chrome/browser/ui:layout_constants",
+       "//chrome/browser/ui:tab_ui_helper",
+       "//chrome/browser/ui:ui_features",
+       "//chrome/browser/ui/browser_window",
+--- a/chrome/browser/ui/tabs/tab_strip_prefs.cc
++++ b/chrome/browser/ui/tabs/tab_strip_prefs.cc
+@@ -7,6 +7,7 @@
+ #include "base/time/time.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
++#include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/helium/helium_layout_state_controller.h"
+ #include "chrome/browser/ui/tabs/features.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
+@@ -30,7 +31,7 @@ void RegisterProfilePrefs(user_prefs::Pr
+                                 false);
+   registry->RegisterBooleanPref(prefs::kVerticalTabsCollapsedState, false);
+   registry->RegisterIntegerPref(prefs::kVerticalTabsUncollapsedWidth,
+-                                kVerticalTabStripDefaultUncollapsedWidth);
++                                GetVerticalTabStripDefaultUncollapsedWidth());
+   registry->RegisterTimePref(prefs::kVerticalTabsEverythingMenuLastPressed,
+                              base::Time());
+ 
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
+@@ -6,6 +6,7 @@
+ 
+ #include "cc/paint/paint_flags.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
++#include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
+ #include "chrome/browser/ui/views/frame/custom_corners_background.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+@@ -54,7 +55,7 @@ void VerticalTabStripBackgroundBlurBackd
+   auto color = GetColorProvider()->GetColor(kColorToolbar);
+   color = SkColorSetA(color, base::ClampRound(alpha_ * 255.0f));
+   gfx::Rect rect = GetLocalBounds();
+-  rect.set_width(tabs::kVerticalTabStripCollapsedWidth);
++  rect.set_width(GetVerticalTabStripCollapsedWidth());
+   rect = GetMirroredRect(rect);
+   canvas->FillRect(rect, color);
+ 
+--- a/chrome/browser/ui/views/tabs/common/tab_group_unfocus_button.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_group_unfocus_button.cc
+@@ -142,7 +142,7 @@ SkColor TabGroupUnfocusButton::GetForegr
+ 
+ void TabGroupUnfocusButton::UpdateCollapsedState() {
+   const int collapsed_width =
+-      tabs::kVerticalTabStripCollapsedWidth -
++      GetVerticalTabStripCollapsedWidth() -
+       2 * GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
+   const bool is_collapsed = orientation_ == TabStripOrientation::kVertical &&
+                             width() > 0 && width() <= collapsed_width;
+--- a/chrome/browser/ui/views/tabs/common/tab_group_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_group_view.cc
+@@ -7,6 +7,7 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/tabs/tab_group_data.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+@@ -604,7 +605,7 @@ bool TabGroupView::CanShowEditorBubbleBu
+   return orientation_ == TabStripOrientation::kVertical &&
+          (GetTabStripCollapseState() ==
+               tabs::VerticalTabStripCollapseState::kExpanded ||
+-          width() > tabs::kVerticalTabStripCollapsedWidth);
++          width() > GetVerticalTabStripCollapsedWidth());
+ }
+ 
+ HorizontalTabClosingHelper* TabGroupView::GetTabClosingHelper() const {
+--- a/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_controller.cc
++++ b/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_controller.cc
+@@ -110,8 +110,8 @@ base::TimeDelta GetShowDelay(BrowserWind
+     // the default uncollapsed width.
+     tab_width = tab_strip->width();
+ 
+-    tab_min_width = tabs::kVerticalTabStripCollapsedWidth;
+-    tab_standard_width = tabs::kVerticalTabStripDefaultUncollapsedWidth;
++    tab_min_width = GetVerticalTabStripCollapsedWidth();
++    tab_standard_width = GetVerticalTabStripDefaultUncollapsedWidth();
+   } else {
+     // Use the largest tab in the tab strip when determining the delay so that
+     // the delay is consistent for all tabs within the tab strip.
+--- a/chrome/browser/ui/views/tabs/organizer/layout_constants.h
++++ b/chrome/browser/ui/views/tabs/organizer/layout_constants.h
+@@ -6,15 +6,13 @@
+ #define CHROME_BROWSER_UI_VIEWS_TABS_ORGANIZER_LAYOUT_CONSTANTS_H_
+ 
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+-#include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
+ #include "ui/color/color_id.h"
+ #include "ui/gfx/geometry/insets.h"
+ 
+ namespace organizer_panel {
+ 
+ // Minimum width of the organizer panel.
+-inline constexpr int kOrganizerPanelMinWidth =
+-    tabs::kVerticalTabStripDefaultUncollapsedWidth;
++inline constexpr int kOrganizerPanelMinWidth = 200;
+ 
+ // Default width of the organizer panel (used in horizontal tabs mode).
+ inline constexpr int kOrganizerPanelDefaultWidth = 320;
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
+@@ -274,7 +274,7 @@ views::ProposedLayout VerticalTabStripTo
+     }
+ 
+     const int collapsed_width =
+-        tabs::kVerticalTabStripCollapsedWidth -
++        GetVerticalTabStripCollapsedWidth() -
+         2 * GetLayoutConstant(
+                 LayoutConstant::kVerticalTabStripHorizontalPadding);
+     const int expected_uncollapsed_width =
